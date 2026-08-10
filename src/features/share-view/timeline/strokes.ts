@@ -98,8 +98,14 @@ export function useThreadStrokes(opts: {
   }, [alive, pts, level, basePath, total]);
 
   // Draw-in on mount: dash the full length, sweep the offset to zero.
+  // The dash rides the squiggled path, which is slightly longer than the
+  // base geometry — pad the length so the line's end never falls into the
+  // dash gap and pops in late.
   const drawing = !reducedMotion;
-  const drawLen = useMemo(() => (drawing ? pathLength(basePath) : 0), [drawing, basePath]);
+  const drawLen = useMemo(
+    () => (drawing ? pathLength(basePath) * 1.08 + 24 : 0),
+    [drawing, basePath],
+  );
   const drawOffset = useSharedValue(0);
   useEffect(() => {
     if (!drawing || drawLen <= 0) return;

@@ -206,7 +206,10 @@ export function buildThreadGeometry(
   const endX = closed && thread.integratedOn ? scale.x(thread.integratedOn) : scale.right;
   const startY = yFor(startLoudness);
 
-  const curve = Math.min(curveLength, Math.max(24, (endX - forkX) * 0.25));
+  // Never let the fork/merge curves overlap on a short span — control
+  // points behind the run end would loop back past the merge point.
+  const span = endX - forkX;
+  const curve = Math.min(curveLength, Math.max(24, span * 0.25), Math.max(2, span * 0.5));
   const forkEndX = forkVisible ? Math.min(forkX + curve, endX) : scale.left;
   const runEnd = closed ? Math.max(forkEndX, endX - curve) : endX;
 
@@ -227,9 +230,13 @@ export function buildThreadGeometry(
     const ny = yFor(entry.loudness);
     if (ny === curY) continue;
     const holdTo = Math.max(curX, Math.min(ex, runEnd - STEP));
-    d += ` L ${holdTo} ${curY}`;
     const stepTo = Math.min(holdTo + STEP, runEnd);
-    d += ` C ${holdTo + STEP * 0.5} ${curY}, ${holdTo + STEP * 0.5} ${ny}, ${stepTo} ${ny}`;
+    const w = stepTo - holdTo;
+    // A change with no room left before the run end would hook past the
+    // endpoint (control points beyond runEnd) — drop it, it is sub-pixel.
+    if (w < 2) continue;
+    d += ` L ${holdTo} ${curY}`;
+    d += ` C ${holdTo + w * 0.5} ${curY}, ${holdTo + w * 0.5} ${ny}, ${stepTo} ${ny}`;
     curX = stepTo;
     curY = ny;
   }
