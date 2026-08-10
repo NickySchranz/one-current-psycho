@@ -156,6 +156,10 @@ export type ThreadGeometry = {
   endsOnMain: boolean;
   laneY: number;
   thickness: number;
+  /** The last shared loudness level — drives the slither. */
+  endLoudness: number;
+  /** True when the thread was still open at the window end. */
+  open: boolean;
   opacity: number;
   color: string;
   /** Markers for moment / step events along the line. */
@@ -280,6 +284,8 @@ export function buildThreadGeometry(
     endsOnMain,
     laneY: baseY,
     thickness: loudnessToThickness(endLoudness),
+    endLoudness,
+    open: !closed,
     opacity: style.opacity,
     color,
     eventPoints,

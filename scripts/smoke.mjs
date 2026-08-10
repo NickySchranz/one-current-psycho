@@ -73,20 +73,15 @@ await page.locator("svg circle").first().click();
 await page.waitForTimeout(400);
 check("event detail card", (await page.getByText(/^on “/).count()) > 0);
 
-// 5. day-by-day tab: the History-style day pager; step back to a recorded day
+// 5. day-by-day tab: every day stacked under each other, each recorded day
+//    opening with its animated mini timeline; quiet runs folded into a line
 await page.getByRole("button", { name: "Day by day" }).click();
-await page.waitForTimeout(500);
-check("day pager energy", (await page.getByText(/Energy · feelings/).count()) > 0);
-let foundLoudness = false;
-for (let i = 0; i < 45 && !foundLoudness; i++) {
-  if ((await page.getByText(/loudness moved to/).count()) > 0) {
-    foundLoudness = true;
-    break;
-  }
-  await page.getByRole("button", { name: "Previous day" }).click();
-  await page.waitForTimeout(120);
-}
-check("day by day", foundLoudness);
+await page.waitForTimeout(600);
+const daySvgs = await page.locator("svg").count();
+check("day strips render", daySvgs > 3, `svgs=${daySvgs}`);
+check("day by day", (await page.getByText(/loudness moved to/).count()) > 0);
+check("quiet days folded", (await page.getByText(/nothing recorded/).count()) > 0);
+await page.screenshot({ path: "/tmp/psycho-daybyday.png", fullPage: true });
 
 // 6. phone-sized rendering
 await page.setViewportSize({ width: 390, height: 844 });

@@ -1,5 +1,12 @@
-import { useMemo, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import { ScrollView, View } from "react-native";
+import Animated, {
+  useAnimatedProps,
+  useReducedMotion,
+  useSharedValue,
+  withTiming,
+  Easing,
+} from "react-native-reanimated";
 import Svg, { Circle, G, Line, Path, Text as SvgText } from "react-native-svg";
 import type { ShareExport } from "@/domain/share-types";
 import { fmtDay } from "@/domain/dates";
@@ -18,26 +25,109 @@ import {
   assignLanes,
   buildThreadGeometry,
   laneExtents,
+  type ThreadGeometry,
 } from "./geometry";
+import { useMainFlow, useThreadStrokes } from "./strokes";
 import { EventDetailCard } from "./EventDetailCard";
 import { ThreadDetailCard } from "./ThreadDetailCard";
+
+const AnimatedPath = Animated.createAnimatedComponent(Path);
+const AnimatedG = Animated.createAnimatedComponent(G);
 
 const PAD_L = 12;
 const PAD_R = 20;
 const MIN_WIDTH = 640;
+/** Opacity a group steps back to while another line holds the focus. */
+const DIM = 0.35;
 
 type Selection =
   | { type: "thread"; threadId: string }
   | { type: "event"; threadId: string; index: number };
 
+/** `.branch-dimmed` — the whole group eases back over 250ms. */
+function useDimProps(dimmed: boolean) {
+  const v = useSharedValue(dimmed ? DIM : 1);
+  useEffect(() => {
+    v.value = withTiming(dimmed ? DIM : 1, {
+      duration: 250,
+      easing: Easing.inOut(Easing.ease),
+    });
+  }, [dimmed, v]);
+  return useAnimatedProps(() => ({ opacity: v.value }));
+}
+
+/**
+ * Pass one — one thread's strokes: a generous hit area, the visible line
+ * (drawing itself in when the share opens, slithering with its loudness
+ * while open), and directional flow dashes toward the window end.
+ */
+function ThreadLine({
+  g,
+  index,
+  focused,
+  dimmed,
+  reducedMotion,
+  onPress,
+}: {
+  g: ThreadGeometry;
+  index: number;
+  focused: boolean;
+  dimmed: boolean;
+  reducedMotion: boolean;
+  onPress: () => void;
+}) {
+  const tk = useTheme();
+  const strokes = useThreadStrokes({
+    trembling: g.open && g.endLoudness > 1,
+    level: g.endLoudness,
+    basePath: g.path,
+    drawInDelay: 90 * index,
+    flowing: g.open,
+    flowDurationMs: tk.flowDuration,
+    reducedMotion,
+  });
+  const groupProps = useDimProps(dimmed);
+
+  return (
+    <AnimatedG animatedProps={groupProps}>
+      {/* generous invisible hit area — the true geometry, never squiggled */}
+      <Path d={g.path} stroke="transparent" strokeWidth={22} fill="none" onPress={onPress} />
+      <AnimatedPath
+        animatedProps={strokes.line}
+        stroke={g.color}
+        strokeWidth={focused ? g.thickness + 1.25 : g.thickness}
+        opacity={g.opacity}
+        fill="none"
+        strokeLinecap="round"
+        pointerEvents="none"
+      />
+      {/* subtle directional movement toward the present */}
+      {g.open && (
+        <AnimatedPath
+          animatedProps={strokes.flow}
+          stroke={g.color}
+          strokeWidth={Math.max(1.5, g.thickness - 1)}
+          strokeDasharray={tk.flowDash}
+          opacity={0.85}
+          fill="none"
+          strokeLinecap="round"
+          pointerEvents="none"
+        />
+      )}
+    </AnimatedG>
+  );
+}
+
 /**
  * The whole share as one summarized timeline, drawn the way the client's
  * own app draws their life: a main line with each shared thread forking
  * away, pulled further out the louder it felt, curving back when it
- * integrated. Tap a line or a marker for the full detail.
+ * integrated. Open lines slither with their loudness, exactly like the
+ * client's own view. Tap a line or a marker for the full detail.
  */
 export function ShareTimeline({ share }: { share: ShareExport }) {
   const tk = useTheme();
+  const reducedMotion = useReducedMotion();
   const [containerW, setContainerW] = useState(0);
   const [selection, setSelection] = useState<Selection | null>(null);
 
@@ -59,6 +149,8 @@ export function ShareTimeline({ share }: { share: ShareExport }) {
     });
     return { scale, geometries, mainY, height };
   }, [share, width, laneGap, curveLength, tk.mode]);
+
+  const mainFlowProps = useMainFlow(tk.mainFlowDuration, reducedMotion);
 
   if (share.threads.length === 0) {
     return <Hint>This share holds no threads.</Hint>;
@@ -107,7 +199,7 @@ export function ShareTimeline({ share }: { share: ShareExport }) {
         </G>
       ))}
 
-      {/* the main line: the client's one current */}
+      {/* the main line: the client's one current, with its slow current */}
       <Line
         x1={0}
         y1={mainY}
@@ -117,38 +209,38 @@ export function ShareTimeline({ share }: { share: ShareExport }) {
         strokeWidth={3.25}
         strokeLinecap="round"
       />
+      <AnimatedPath
+        animatedProps={mainFlowProps}
+        d={`M 0 ${mainY} L ${width} ${mainY}`}
+        stroke={tk.accent}
+        strokeWidth={2}
+        fill="none"
+        strokeLinecap="round"
+        strokeDasharray={tk.mainFlowDash}
+        opacity={0.7}
+        pointerEvents="none"
+      />
 
       {/* pass one — every line and its hit area, so no line ever covers
           another thread's markers */}
       {share.threads.map((th, i) => {
-        const g = geometries[i];
         const focused = selection?.threadId === th.id;
         return (
-          <G key={th.id} opacity={selection && !focused ? 0.35 : 1}>
-            {/* generous invisible hit area */}
-            <Path
-              d={g.path}
-              stroke="transparent"
-              strokeWidth={22}
-              fill="none"
-              onPress={() =>
-                setSelection(
-                  focused && selection?.type === "thread"
-                    ? null
-                    : { type: "thread", threadId: th.id },
-                )
-              }
-            />
-            <Path
-              d={g.path}
-              stroke={g.color}
-              strokeWidth={focused ? g.thickness + 1.25 : g.thickness}
-              opacity={g.opacity}
-              fill="none"
-              strokeLinecap="round"
-              pointerEvents="none"
-            />
-          </G>
+          <ThreadLine
+            key={th.id}
+            g={geometries[i]}
+            index={i}
+            focused={focused}
+            dimmed={!!selection && !focused}
+            reducedMotion={reducedMotion}
+            onPress={() =>
+              setSelection(
+                focused && selection?.type === "thread"
+                  ? null
+                  : { type: "thread", threadId: th.id },
+              )
+            }
+          />
         );
       })}
 
@@ -157,98 +249,18 @@ export function ShareTimeline({ share }: { share: ShareExport }) {
         const g = geometries[i];
         const focused = selection?.threadId === th.id;
         return (
-          <G key={th.id} opacity={selection && !focused ? 0.35 : 1}>
-            {/* moments and steps along the line */}
-            {g.eventPoints.map((p) => {
-              const isSel =
-                selection?.type === "event" &&
-                selection.threadId === th.id &&
-                selection.index === p.index;
-              return (
-                <Circle
-                  key={p.index}
-                  cx={p.x}
-                  cy={p.y}
-                  r={isSel ? 6 : 4.5}
-                  fill={g.color}
-                  stroke={tk.bg}
-                  strokeWidth={1.5}
-                  onPress={() =>
-                    setSelection(
-                      isSel ? null : { type: "event", threadId: th.id, index: p.index },
-                    )
-                  }
-                />
-              );
-            })}
-
-            {/* fork point on the main line — when the start is inside the window */}
-            {g.forkVisible && (
-              <Circle
-                cx={g.forkX}
-                cy={mainY}
-                r={4}
-                stroke={g.color}
-                strokeWidth={2}
-                fill={tk.bg}
-                onPress={() => selectBoundary(th.id, "started")}
-              />
-            )}
-
-            {/* an integrated line ends on the main line; an open one reaches the window end */}
-            {g.endsOnMain ? (
-              <Circle
-                cx={g.endX}
-                cy={g.endY}
-                r={6}
-                stroke={g.color}
-                strokeWidth={2.5}
-                fill={tk.bg}
-                onPress={() => selectBoundary(th.id, "integrated")}
-              />
-            ) : (
-              <Circle
-                cx={g.endX - 3}
-                cy={g.endY}
-                r={5}
-                fill={g.color}
-                opacity={g.opacity}
-                onPress={() => setSelection({ type: "thread", threadId: th.id })}
-              />
-            )}
-
-            {/* label: a stroked twin behind the text keeps it readable over lines */}
-            {g.labelVisible && (
-              <>
-                <SvgText
-                  x={g.labelX}
-                  y={g.labelY}
-                  textAnchor={g.labelAnchor}
-                  fontSize={12.5}
-                  fontWeight={focused ? "700" : "600"}
-                  fontFamily={tk.fontBody}
-                  stroke={tk.bg}
-                  strokeWidth={4}
-                  fill={tk.bg}
-                  pointerEvents="none"
-                >
-                  {g.label}
-                </SvgText>
-                <SvgText
-                  x={g.labelX}
-                  y={g.labelY}
-                  textAnchor={g.labelAnchor}
-                  fontSize={12.5}
-                  fontWeight={focused ? "700" : "600"}
-                  fontFamily={tk.fontBody}
-                  fill={g.color}
-                  onPress={() => setSelection({ type: "thread", threadId: th.id })}
-                >
-                  {g.label}
-                </SvgText>
-              </>
-            )}
-          </G>
+          <ThreadMarkers
+            key={th.id}
+            share={share}
+            threadIndex={i}
+            g={g}
+            mainY={mainY}
+            focused={focused}
+            dimmed={!!selection && !focused}
+            selection={selection}
+            setSelection={setSelection}
+            selectBoundary={selectBoundary}
+          />
         );
       })}
 
@@ -279,14 +291,141 @@ export function ShareTimeline({ share }: { share: ShareExport }) {
           chart
         ))}
       <Hint style={{ marginTop: 4 }}>
-        Louder threads sit further from the main line and draw heavier. Tap a line for the
-        thread, a dot for what happened there.
+        Louder threads sit further from the main line, draw heavier and tremble. Tap a line
+        for the thread, a dot for what happened there.
       </Hint>
       {selectedThread && selectedEvent ? (
         <EventDetailCard thread={selectedThread} event={selectedEvent} />
       ) : selectedThread ? (
-        <ThreadDetailCard thread={selectedThread} />
+        <ThreadDetailCard
+          thread={selectedThread}
+          onSelectEvent={(index) =>
+            setSelection({ type: "event", threadId: selectedThread.id, index })
+          }
+        />
       ) : null}
     </View>
+  );
+}
+
+/** Pass two — one thread's markers, endpoints and label, above every line. */
+function ThreadMarkers({
+  share,
+  threadIndex,
+  g,
+  mainY,
+  focused,
+  dimmed,
+  selection,
+  setSelection,
+  selectBoundary,
+}: {
+  share: ShareExport;
+  threadIndex: number;
+  g: ThreadGeometry;
+  mainY: number;
+  focused: boolean;
+  dimmed: boolean;
+  selection: Selection | null;
+  setSelection: (s: Selection | null) => void;
+  selectBoundary: (threadId: string, kind: "started" | "integrated") => void;
+}) {
+  const tk = useTheme();
+  const th = share.threads[threadIndex];
+  const groupProps = useDimProps(dimmed);
+
+  return (
+    <AnimatedG animatedProps={groupProps}>
+      {/* moments and steps along the line */}
+      {g.eventPoints.map((p) => {
+        const isSel =
+          selection?.type === "event" &&
+          selection.threadId === th.id &&
+          selection.index === p.index;
+        return (
+          <Circle
+            key={p.index}
+            cx={p.x}
+            cy={p.y}
+            r={isSel ? 6 : 4.5}
+            fill={g.color}
+            stroke={tk.bg}
+            strokeWidth={1.5}
+            onPress={() =>
+              setSelection(
+                isSel ? null : { type: "event", threadId: th.id, index: p.index },
+              )
+            }
+          />
+        );
+      })}
+
+      {/* fork point on the main line — when the start is inside the window */}
+      {g.forkVisible && (
+        <Circle
+          cx={g.forkX}
+          cy={mainY}
+          r={4}
+          stroke={g.color}
+          strokeWidth={2}
+          fill={tk.bg}
+          onPress={() => selectBoundary(th.id, "started")}
+        />
+      )}
+
+      {/* an integrated line ends on the main line; an open one reaches the window end */}
+      {g.endsOnMain ? (
+        <Circle
+          cx={g.endX}
+          cy={g.endY}
+          r={6}
+          stroke={g.color}
+          strokeWidth={2.5}
+          fill={tk.bg}
+          onPress={() => selectBoundary(th.id, "integrated")}
+        />
+      ) : (
+        <Circle
+          cx={g.endX - 3}
+          cy={g.endY}
+          r={5}
+          fill={g.color}
+          opacity={g.opacity}
+          onPress={() => setSelection({ type: "thread", threadId: th.id })}
+        />
+      )}
+
+      {/* label: a stroked twin behind the text keeps it readable over lines */}
+      {g.labelVisible && (
+        <>
+          <SvgText
+            x={g.labelX}
+            y={g.labelY}
+            textAnchor={g.labelAnchor}
+            fontSize={12.5}
+            fontWeight={focused ? "700" : "600"}
+            fontFamily={tk.fontBody}
+            stroke={tk.bg}
+            strokeWidth={4}
+            fill={tk.bg}
+            pointerEvents="none"
+          >
+            {g.label}
+          </SvgText>
+          <SvgText
+            x={g.labelX}
+            y={g.labelY}
+            textAnchor={g.labelAnchor}
+            fontSize={12.5}
+            fontWeight={focused ? "700" : "600"}
+            fontFamily={tk.fontBody}
+            fill={g.color}
+            onPress={() => setSelection({ type: "thread", threadId: th.id })}
+          >
+            {g.label}
+          </SvgText>
+        </>
+      )}
+    </AnimatedG>
   );
 }

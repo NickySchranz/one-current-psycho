@@ -53,6 +53,12 @@ export type ThemeTokens = {
   /** Font stacks: full CSS stacks on web, closest single family on native. */
   fontBody: string | undefined;
   fontDisplay: string | undefined;
+  /** Directional flow dashes on thread lines, as in the client app. */
+  flowDuration: number;
+  flowDash: [number, number];
+  /** … and on the main line. */
+  mainFlowDuration: number;
+  mainFlowDash: [number, number];
   /** Whether surfaces cast shadows. */
   shadows: boolean;
 };
@@ -88,6 +94,10 @@ export const THEME_TOKENS: Record<ThemeId, ThemeTokens> = {
     btnRadius: 6,
     fontBody: FONT_SANS,
     fontDisplay: FONT_SANS,
+    flowDuration: 2400,
+    flowDash: [1, 14],
+    mainFlowDuration: 3200,
+    mainFlowDash: [2, 26],
     shadows: true,
   },
   duskwood: {
@@ -111,6 +121,10 @@ export const THEME_TOKENS: Record<ThemeId, ThemeTokens> = {
     btnRadius: 10,
     fontBody: FONT_ROUNDED,
     fontDisplay: FONT_ROUNDED,
+    flowDuration: 3600,
+    flowDash: [1, 10],
+    mainFlowDuration: 4200,
+    mainFlowDash: [2, 20],
     shadows: true,
   },
 };
