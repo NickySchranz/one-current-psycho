@@ -1,0 +1,16 @@
+{
+  "expo": {
+    "name": "One Current — Practice",
+    "slug": "one-current-psycho",
+    "version": "1.0.0",
+    "orientation": "portrait",
+    "userInterfaceStyle": "light",
+    "ios": {
+      "supportsTablet": true
+    },
+    "android": {
+      "predictiveBackGestureEnabled": false
+    },
+    "web": {}
+  }
+}
