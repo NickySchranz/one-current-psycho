@@ -28,8 +28,7 @@ import {
   type ThreadGeometry,
 } from "./geometry";
 import { useMainFlow, useThreadStrokes } from "./strokes";
-import { EventDetailCard } from "./EventDetailCard";
-import { ThreadDetailCard } from "./ThreadDetailCard";
+import type { Selection } from "../selection";
 
 const AnimatedPath = Animated.createAnimatedComponent(Path);
 const AnimatedG = Animated.createAnimatedComponent(G);
@@ -39,10 +38,6 @@ const PAD_R = 20;
 const MIN_WIDTH = 640;
 /** Opacity a group steps back to while another line holds the focus. */
 const DIM = 0.35;
-
-type Selection =
-  | { type: "thread"; threadId: string }
-  | { type: "event"; threadId: string; index: number };
 
 /** `.branch-dimmed` — the whole group eases back over 250ms. */
 function useDimProps(dimmed: boolean) {
@@ -124,12 +119,22 @@ function ThreadLine({
  * away, pulled further out the louder it felt, curving back when it
  * integrated. Open lines slither with their loudness, exactly like the
  * client's own view. Tap a line or a marker for the full detail.
+ *
+ * Selection is owned by the screen: the chart stays put while the content
+ * below it changes.
  */
-export function ShareTimeline({ share }: { share: ShareExport }) {
+export function ShareTimeline({
+  share,
+  selection,
+  onSelect,
+}: {
+  share: ShareExport;
+  selection: Selection | null;
+  onSelect: (s: Selection | null) => void;
+}) {
   const tk = useTheme();
   const reducedMotion = useReducedMotion();
   const [containerW, setContainerW] = useState(0);
-  const [selection, setSelection] = useState<Selection | null>(null);
 
   const width = Math.max(containerW, MIN_WIDTH);
   const compact = width < 760;
@@ -156,19 +161,11 @@ export function ShareTimeline({ share }: { share: ShareExport }) {
     return <Hint>This share holds no threads.</Hint>;
   }
 
-  const selectedThread = selection
-    ? share.threads.find((th) => th.id === selection.threadId)
-    : undefined;
-  const selectedEvent =
-    selection?.type === "event" && selectedThread
-      ? selectedThread.events[selection.index]
-      : undefined;
-
   /** Fork/merge points select their started/integrated event when shared. */
   const selectBoundary = (threadId: string, kind: "started" | "integrated") => {
     const thread = share.threads.find((th) => th.id === threadId);
     const index = thread?.events.findIndex((e) => e.kind === kind) ?? -1;
-    setSelection(
+    onSelect(
       index >= 0 ? { type: "event", threadId, index } : { type: "thread", threadId },
     );
   };
@@ -234,7 +231,7 @@ export function ShareTimeline({ share }: { share: ShareExport }) {
             dimmed={!!selection && !focused}
             reducedMotion={reducedMotion}
             onPress={() =>
-              setSelection(
+              onSelect(
                 focused && selection?.type === "thread"
                   ? null
                   : { type: "thread", threadId: th.id },
@@ -258,7 +255,7 @@ export function ShareTimeline({ share }: { share: ShareExport }) {
             focused={focused}
             dimmed={!!selection && !focused}
             selection={selection}
-            setSelection={setSelection}
+            setSelection={onSelect}
             selectBoundary={selectBoundary}
           />
         );
@@ -290,20 +287,10 @@ export function ShareTimeline({ share }: { share: ShareExport }) {
         ) : (
           chart
         ))}
-      <Hint style={{ marginTop: 4 }}>
+      <Hint style={{ marginTop: 4, marginBottom: 0 }}>
         Louder threads sit further from the main line, draw heavier and tremble. Tap a line
         for the thread, a dot for what happened there.
       </Hint>
-      {selectedThread && selectedEvent ? (
-        <EventDetailCard thread={selectedThread} event={selectedEvent} />
-      ) : selectedThread ? (
-        <ThreadDetailCard
-          thread={selectedThread}
-          onSelectEvent={(index) =>
-            setSelection({ type: "event", threadId: selectedThread.id, index })
-          }
-        />
-      ) : null}
     </View>
   );
 }

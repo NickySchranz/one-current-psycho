@@ -61,17 +61,28 @@ await page.waitForTimeout(500);
 const viewButtons = page.getByRole("button", { name: "View", exact: true });
 check("share rows", (await viewButtons.count()) === 2, `n=${await viewButtons.count()}`);
 
-// 3. open the latest share: timeline with markers
+// 3. open the latest share: timeline with markers, overview spread below
 await viewButtons.first().click();
 await page.waitForTimeout(700);
 const circles = await page.locator("svg circle").count();
 check("timeline markers", circles > 0, `circles=${circles}`);
-await page.screenshot({ path: "/tmp/psycho-timeline-desktop.png" });
+check(
+  "overview spread",
+  (await page.getByText("The threads").count()) > 0 &&
+    (await page.getByText("Steps taken").count()) > 0,
+);
+await page.screenshot({ path: "/tmp/psycho-timeline-desktop.png", fullPage: true });
 
-// 4. tap a marker, the detail card appears
+// 4. tap a marker: content below switches to the focused thread's spread
+//    with the event spelled out; the back button returns to the overview
 await page.locator("svg circle").first().click();
 await page.waitForTimeout(400);
 check("event detail card", (await page.getByText(/^on “/).count()) > 0);
+check("thread spread", (await page.getByText("What happened").count()) > 0);
+await page.screenshot({ path: "/tmp/psycho-thread-detail.png", fullPage: true });
+await page.getByRole("button", { name: "← All shared threads" }).click();
+await page.waitForTimeout(400);
+check("back to overview", (await page.getByText("The threads").count()) > 0);
 
 // 5. day-by-day tab: every day stacked under each other, each recorded day
 //    opening with its animated mini timeline; quiet runs folded into a line
@@ -83,11 +94,11 @@ check("day by day", (await page.getByText(/loudness moved to/).count()) > 0);
 check("quiet days folded", (await page.getByText(/nothing recorded/).count()) > 0);
 await page.screenshot({ path: "/tmp/psycho-daybyday.png", fullPage: true });
 
-// 6. phone-sized rendering
+// 6. phone-sized rendering — the timeline always stays above the tabs
 await page.setViewportSize({ width: 390, height: 844 });
-await page.getByRole("button", { name: "Timeline", exact: true }).click();
+await page.getByRole("button", { name: "Overview", exact: true }).click();
 await page.waitForTimeout(500);
-await page.screenshot({ path: "/tmp/psycho-timeline-phone.png" });
+await page.screenshot({ path: "/tmp/psycho-timeline-phone.png", fullPage: true });
 check("phone render markers", (await page.locator("svg circle").count()) > 0);
 await page.setViewportSize({ width: 1200, height: 900 });
 
