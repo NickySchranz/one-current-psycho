@@ -32,7 +32,7 @@ export function Header({ wide = false }: { wide?: boolean }) {
         gap: 8,
         paddingTop: 8 + insets.top,
         paddingBottom: 8,
-        paddingHorizontal: 12,
+        paddingHorizontal: 16,
         borderBottomWidth: 1,
         borderBottomColor: alpha(t.lineAxis, 0.55),
         backgroundColor: alpha(t.bgRaised, 0.82),

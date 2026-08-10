@@ -72,10 +72,10 @@ export function ClientDetailScreen({ clientId }: { clientId: string }) {
   return (
     <ScrollView style={{ flex: 1 }}>
       <Panel>
-        <H1>{client.name}</H1>
-        {client.notes ? <Hint>{client.notes}</Hint> : null}
+        <H1 style={{ marginBottom: 4 }}>{client.name}</H1>
+        {client.notes ? <Hint style={{ marginBottom: 0 }}>{client.notes}</Hint> : null}
 
-        <H2>Shared files</H2>
+        <H2 style={{ marginTop: 20 }}>Shared files</H2>
         {shares.length === 0 && (
           <Card>
             <Hint style={{ marginBottom: 0 }}>
@@ -119,7 +119,7 @@ export function ClientDetailScreen({ clientId }: { clientId: string }) {
           </Card>
         ))}
 
-        <H2>Import a shared file</H2>
+        <H2 style={{ marginTop: 8 }}>Import a shared file</H2>
         <Card>
           <Hint>
             Your client exports this file from One Current under More → Share with a
@@ -152,7 +152,17 @@ export function ClientDetailScreen({ clientId }: { clientId: string }) {
           )}
         </Card>
 
-        <View style={[rowStyles.filterRow, { marginTop: 8 }]}>
+        <View
+          style={[
+            rowStyles.filterRow,
+            {
+              marginTop: 24,
+              paddingTop: 16,
+              borderTopWidth: 1,
+              borderTopColor: t.lineAxis,
+            },
+          ]}
+        >
           {!confirmingClient ? (
             <Button
               variant="danger"

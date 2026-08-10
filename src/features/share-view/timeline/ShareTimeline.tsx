@@ -4,6 +4,7 @@ import Animated, {
   useAnimatedProps,
   useReducedMotion,
   useSharedValue,
+  withDelay,
   withTiming,
   Easing,
 } from "react-native-reanimated";
@@ -39,16 +40,31 @@ const MIN_WIDTH = 640;
 /** Opacity a group steps back to while another line holds the focus. */
 const DIM = 0.35;
 
-/** `.branch-dimmed` — the whole group eases back over 250ms. */
-function useDimProps(dimmed: boolean) {
+/**
+ * `.branch-dimmed` — the whole group eases back over 250ms. With a delay,
+ * the group also fades in on mount, so markers arrive with their line's
+ * draw-in instead of floating before it exists.
+ */
+function useDimProps(dimmed: boolean, appearDelayMs = 0) {
   const v = useSharedValue(dimmed ? DIM : 1);
+  const appeared = useSharedValue(appearDelayMs > 0 ? 0 : 1);
   useEffect(() => {
     v.value = withTiming(dimmed ? DIM : 1, {
       duration: 250,
       easing: Easing.inOut(Easing.ease),
     });
   }, [dimmed, v]);
-  return useAnimatedProps(() => ({ opacity: v.value }));
+  useEffect(() => {
+    if (appearDelayMs > 0) {
+      appeared.value = withDelay(
+        appearDelayMs,
+        withTiming(1, { duration: 450, easing: Easing.out(Easing.ease) }),
+      );
+    }
+    // Appear once per mounted group.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
+  return useAnimatedProps(() => ({ opacity: v.value * appeared.value }));
 }
 
 /**
@@ -254,6 +270,7 @@ export function ShareTimeline({
             mainY={mainY}
             focused={focused}
             dimmed={!!selection && !focused}
+            reducedMotion={reducedMotion}
             selection={selection}
             setSelection={onSelect}
             selectBoundary={selectBoundary}
@@ -303,6 +320,7 @@ function ThreadMarkers({
   mainY,
   focused,
   dimmed,
+  reducedMotion,
   selection,
   setSelection,
   selectBoundary,
@@ -313,13 +331,15 @@ function ThreadMarkers({
   mainY: number;
   focused: boolean;
   dimmed: boolean;
+  reducedMotion: boolean;
   selection: Selection | null;
   setSelection: (s: Selection | null) => void;
   selectBoundary: (threadId: string, kind: "started" | "integrated") => void;
 }) {
   const tk = useTheme();
   const th = share.threads[threadIndex];
-  const groupProps = useDimProps(dimmed);
+  // Markers arrive as their line finishes drawing itself in.
+  const groupProps = useDimProps(dimmed, reducedMotion ? 0 : 90 * threadIndex + 550);
 
   return (
     <AnimatedG animatedProps={groupProps}>

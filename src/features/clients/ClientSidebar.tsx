@@ -47,7 +47,7 @@ export function ClientSidebar() {
       <View
         style={{
           paddingTop: 16,
-          paddingHorizontal: 14,
+          paddingHorizontal: 16,
           paddingBottom: 10,
           borderBottomWidth: 1,
           borderBottomColor: alpha(t.lineAxis, 0.4),
@@ -103,13 +103,13 @@ export function ClientSidebar() {
 
       <ScrollView style={{ flex: 1 }}>
         {clients.length === 0 && (
-          <View style={{ padding: 14 }}>
+          <View style={{ padding: 16 }}>
             <Hint>No clients yet. Add one above, or load the examples to explore.</Hint>
             <Button label="Load example clients" onPress={() => void loadExampleClients()} />
           </View>
         )}
         {shown.length === 0 && clients.length > 0 && (
-          <Hint style={{ padding: 14 }}>No client matches “{filter.trim()}”.</Hint>
+          <Hint style={{ padding: 16 }}>No client matches “{filter.trim()}”.</Hint>
         )}
         {shown.map((c) => {
           const clientShares = shares.filter((sh) => sh.clientId === c.id);
@@ -128,7 +128,7 @@ export function ClientSidebar() {
                   .hovered;
                 return {
                 paddingVertical: 11,
-                paddingHorizontal: 14,
+                paddingHorizontal: 16,
                 borderLeftWidth: 3,
                 borderLeftColor: selected ? t.accent : "transparent",
                 backgroundColor: selected
@@ -160,7 +160,7 @@ export function ClientSidebar() {
           );
         })}
         {clients.length > 0 && (
-          <View style={{ padding: 14 }}>
+          <View style={{ padding: 16 }}>
             <Button
               variant="quiet"
               label="Load example clients"

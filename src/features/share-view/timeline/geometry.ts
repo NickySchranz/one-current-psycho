@@ -7,6 +7,7 @@
  */
 import type { SharedThread } from "@/domain/share-types";
 import type { DateScale } from "./date-scale";
+import { samplePath } from "./path-sample";
 
 /* ---------- constants shared with the client app ---------- */
 
@@ -219,7 +220,6 @@ export function buildThreadGeometry(
 
   // Stepped run: hold each loudness level, then ease to the next over 14px.
   const STEP = 14;
-  const segments: { x: number; y: number }[] = [{ x: forkEndX, y: startY }];
   let curX = forkEndX;
   let curY = startY;
   for (const entry of log) {
@@ -232,7 +232,6 @@ export function buildThreadGeometry(
     d += ` C ${holdTo + STEP * 0.5} ${curY}, ${holdTo + STEP * 0.5} ${ny}, ${stepTo} ${ny}`;
     curX = stepTo;
     curY = ny;
-    segments.push({ x: holdTo, y: ny });
   }
   d += ` L ${runEnd} ${curY}`;
 
@@ -244,13 +243,22 @@ export function buildThreadGeometry(
     endsOnMain = true;
   }
 
+  // Markers must sit exactly on the drawn line — including fork curves and
+  // the eased loudness steps — so read y from the real path, not from the
+  // step levels. x only ever grows along our paths, so a scan suffices.
+  const samples = samplePath(d, 4);
   const yAt = (x: number): number => {
-    let y = segments[0].y;
-    for (const s of segments) {
-      if (s.x <= x) y = s.y;
-      else break;
+    if (samples.length === 0) return curY;
+    let prev = samples[0];
+    for (const s of samples) {
+      if (s.x >= x) {
+        const span = s.x - prev.x;
+        const f = span > 0 ? (x - prev.x) / span : 0;
+        return prev.y + (s.y - prev.y) * f;
+      }
+      prev = s;
     }
-    return y;
+    return samples[samples.length - 1].y;
   };
 
   // Moment and step markers sit on the line; started/integrated are drawn

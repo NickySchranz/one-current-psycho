@@ -1,4 +1,4 @@
-import { View } from "react-native";
+import { View, type StyleProp, type ViewStyle } from "react-native";
 import type { SharedEvent, SharedThread } from "@/domain/share-types";
 import { fmtDay } from "@/domain/dates";
 import { KIND_LABELS, kindColor } from "@/features/share-view/kinds";
@@ -41,15 +41,17 @@ function heading(event: SharedEvent, t: ThemeTokens): { text: string; color: str
 export function EventDetailCard({
   thread,
   event,
+  style,
 }: {
   thread: SharedThread;
   event: SharedEvent;
+  style?: StyleProp<ViewStyle>;
 }) {
   const t = useTheme();
   const h = heading(event, t);
 
   return (
-    <Card>
+    <Card style={style}>
       <View style={{ flexDirection: "row", alignItems: "center", gap: 8 }}>
         <View style={{ width: 10, height: 10, borderRadius: 5, backgroundColor: h.color }} />
         <T style={{ fontWeight: "600" }}>{h.text}</T>

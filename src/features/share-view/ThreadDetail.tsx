@@ -7,12 +7,12 @@
 import { Pressable, View } from "react-native";
 import type { SharedEvent, SharedThread } from "@/domain/share-types";
 import { fmtDay } from "@/domain/dates";
-import { Button, Card, Hint, T, Tag, rowStyles } from "@/ui/primitives";
+import { Button, Card, Hint, Overline, T, Tag, rowStyles } from "@/ui/primitives";
+import { SpreadColumns, type SpreadCard } from "@/ui/SpreadColumns";
 import { useTheme } from "@/ui/theme";
 import { KIND_LABELS, kindColor } from "./kinds";
 import { isClosedThread, threadColor } from "./timeline/geometry";
 import { EventDetailCard } from "./timeline/EventDetailCard";
-import { Overline, spreadCell, spreadRow } from "./ShareOverview";
 import type { Selection } from "./selection";
 
 /** One line of the thread's record: what happened, when. */
@@ -90,19 +90,27 @@ export function ThreadDetail({
     (thread.qualitiesReclaimed?.length ?? 0) > 0 ||
     !!w;
 
-  return (
-    <View>
-      <View style={{ flexDirection: "row", marginBottom: 10 }}>
-        <Button
-          label="← All shared threads"
-          variant="quiet"
-          onPress={() => onSelect(null)}
-        />
-      </View>
+  const tagSections = [
+    thread.feelings,
+    thread.anxieties,
+    thread.needs,
+    thread.qualitiesReclaimed,
+  ].filter((items) => (items?.length ?? 0) > 0).length;
+  const infoRows = [
+    thread.description,
+    thread.startedOn,
+    thread.integratedOn,
+    thread.controllability,
+    thread.originalBelief,
+    thread.currentBelief,
+  ].filter(Boolean).length;
 
-      <View style={spreadRow}>
-        {/* the thread itself */}
-        <Card style={spreadCell}>
+  const cards: SpreadCard[] = [
+    {
+      key: "thread",
+      weight: 4 + infoRows,
+      node: (
+        <Card style={{ marginBottom: 0 }}>
           <Overline>The thread</Overline>
           <View style={{ flexDirection: "row", alignItems: "center", gap: 8 }}>
             <View
@@ -138,11 +146,18 @@ export function ThreadDetail({
           <Row label="Original belief" value={thread.originalBelief} />
           <Row label="Belief now" value={thread.currentBelief} />
         </Card>
+      ),
+    },
+  ];
 
-        {/* everything it holds emotionally */}
-        {holdsAnything && (
-          <Card style={spreadCell}>
-            <Overline>What it holds</Overline>
+  // everything it holds emotionally
+  if (holdsAnything) {
+    cards.push({
+      key: "holds",
+      weight: 2 + tagSections * 2 + (w ? 6 : 0),
+      node: (
+        <Card style={{ marginBottom: 0 }}>
+          <Overline>What it holds</Overline>
             <TagRow
               label={closed ? "Feelings it held while open" : "Feelings it holds"}
               items={thread.feelings}
@@ -178,11 +193,17 @@ export function ThreadDetail({
                 <TagRow label="Reclaimed already" items={w.reclaimedNow} quality />
               </View>
             ) : null}
-          </Card>
-        )}
+        </Card>
+      ),
+    });
+  }
 
-        {/* the full record inside the shared window */}
-        <Card style={spreadCell}>
+  // the full record inside the shared window
+  cards.push({
+    key: "record",
+    weight: 3 + Math.max(1, thread.events.length) * 2,
+    node: (
+        <Card style={{ marginBottom: 0 }}>
           <Overline>What happened</Overline>
           {thread.events.length === 0 && (
             <Hint style={{ marginBottom: 0 }}>
@@ -248,10 +269,25 @@ export function ThreadDetail({
             </Hint>
           )}
         </Card>
+    ),
+  });
+
+  return (
+    <View>
+      <View style={{ flexDirection: "row", marginBottom: 12, marginLeft: -12 }}>
+        <Button
+          label="← All shared threads"
+          variant="quiet"
+          onPress={() => onSelect(null)}
+        />
       </View>
 
+      <SpreadColumns cards={cards} />
+
       {/* the selected event, spelled out full width */}
-      {event ? <EventDetailCard thread={thread} event={event} /> : null}
+      {event ? (
+        <EventDetailCard thread={thread} event={event} style={{ marginTop: 12, marginBottom: 0 }} />
+      ) : null}
     </View>
   );
 }

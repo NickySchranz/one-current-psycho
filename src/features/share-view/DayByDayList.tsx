@@ -2,34 +2,13 @@ import { useMemo } from "react";
 import { View } from "react-native";
 import type { ShareExport, SharedThread } from "@/domain/share-types";
 import { fmtDay } from "@/domain/dates";
-import { CalmNote, Card, H3, Hint, T } from "@/ui/primitives";
-import { useTheme } from "@/ui/theme";
+import { CalmNote, Card, Hint, Overline, T } from "@/ui/primitives";
 import { DayStrip, type DayStripEntry } from "./DayStrip";
 
 const DAY_MS = 24 * 60 * 60 * 1000;
 
 function addDays(iso: string, days: number): string {
   return new Date(Date.parse(iso + "T00:00:00Z") + days * DAY_MS).toISOString().slice(0, 10);
-}
-
-/** The uppercase overline for a section, as in the client app's History. */
-function SectionTitle({ children }: { children?: React.ReactNode }) {
-  const t = useTheme();
-  return (
-    <H3
-      style={{
-        fontSize: 12.5,
-        fontWeight: "600",
-        letterSpacing: 0.75,
-        textTransform: "uppercase",
-        color: t.inkSoft,
-        marginTop: 11.2,
-        marginBottom: 4.8,
-      }}
-    >
-      {children}
-    </H3>
-  );
 }
 
 /** The thread's shared loudness as it stood at the end of a given day. */
@@ -105,23 +84,23 @@ function DaySection({ share, day }: { share: ShareExport; day: string }) {
   );
 
   return (
-    <View style={{ marginBottom: 10 }}>
-      <SectionTitle>{fmtDay(day)}</SectionTitle>
+    <View style={{ marginBottom: 8 }}>
+      <Overline style={{ marginTop: 16, marginBottom: 8 }}>{fmtDay(day)}</Overline>
 
       {entries.length > 0 && (
-        <Card sunken style={{ gap: 4 }}>
+        <Card sunken style={{ gap: 4, marginBottom: 8 }}>
           <DayStrip entries={entries} />
         </Card>
       )}
       {returned.length > 0 && (
-        <Hint style={{ marginTop: 4, marginBottom: 0 }}>
+        <Hint style={{ marginTop: 0, marginBottom: 8, fontSize: 13.6 }}>
           Returned by this day's decisions: {returned.join(", ")}
         </Hint>
       )}
 
       {decided.map(({ thread, event }, i) =>
         event.kind === "action-decided" ? (
-          <Card key={`dec-${i}`} sunken>
+          <Card key={`dec-${i}`} sunken style={{ marginBottom: 8 }}>
             <T style={{ fontWeight: "600" }}>{event.title}</T>
             <Hint style={{ marginBottom: 0 }}>
               step decided, toward “{thread.title}”
@@ -136,7 +115,7 @@ function DaySection({ share, day }: { share: ShareExport; day: string }) {
 
       {done.map(({ thread, event }, i) =>
         event.kind === "action-done" ? (
-          <Card key={`done-${i}`} sunken>
+          <Card key={`done-${i}`} sunken style={{ marginBottom: 8 }}>
             <T style={{ fontWeight: "600" }}>{event.title}</T>
             <Hint style={{ marginBottom: 0 }}>step done, toward “{thread.title}”</Hint>
           </Card>
@@ -145,7 +124,7 @@ function DaySection({ share, day }: { share: ShareExport; day: string }) {
 
       {moments.map(({ thread, event }, i) =>
         event.kind === "moment" ? (
-          <Card key={`moment-${i}`} sunken>
+          <Card key={`moment-${i}`} sunken style={{ marginBottom: 8 }}>
             <T style={{ fontWeight: "600" }}>{event.title}</T>
             <Hint style={{ marginBottom: 0 }}>
               a moment on “{thread.title}”
@@ -160,7 +139,7 @@ function DaySection({ share, day }: { share: ShareExport; day: string }) {
 
       {closed.map(({ thread, event }, i) =>
         event.kind === "integrated" ? (
-          <Card key={`closed-${i}`} sunken>
+          <Card key={`closed-${i}`} sunken style={{ marginBottom: 8 }}>
             <T style={{ fontWeight: "600" }}>{thread.title}</T>
             <Hint style={{ marginBottom: 0 }}>
               {event.result === "converted-to-project"
@@ -178,14 +157,14 @@ function DaySection({ share, day }: { share: ShareExport; day: string }) {
       )}
 
       {started.map(({ thread }, i) => (
-        <Card key={`started-${i}`} sunken>
+        <Card key={`started-${i}`} sunken style={{ marginBottom: 8 }}>
           <T style={{ fontWeight: "600" }}>{thread.title}</T>
           <Hint style={{ marginBottom: 0 }}>began pulling on them this day</Hint>
         </Card>
       ))}
 
       {loudnessMoves.map(({ thread, level }, i) => (
-        <Card key={`loud-${i}`} sunken>
+        <Card key={`loud-${i}`} sunken style={{ marginBottom: 8 }}>
           <T style={{ fontWeight: "600" }}>{thread.title}</T>
           <Hint style={{ marginBottom: 0 }}>loudness moved to {level}</Hint>
         </Card>
@@ -244,7 +223,7 @@ export function DayByDayList({ share }: { share: ShareExport }) {
         block.kind === "day" ? (
           <DaySection key={block.day} share={share} day={block.day} />
         ) : (
-          <Hint key={block.from} style={{ marginTop: 2, marginBottom: 8 }}>
+          <Hint key={block.from} style={{ marginTop: 12, marginBottom: 4, fontSize: 13.6 }}>
             {block.from === block.to
               ? `${fmtDay(block.from)} — nothing recorded. It simply passed.`
               : `${fmtDay(block.from)} – ${fmtDay(block.to)} — nothing recorded. These days simply passed.`}

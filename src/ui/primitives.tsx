@@ -5,6 +5,7 @@ import {
   Text,
   TextInput,
   View,
+  useWindowDimensions,
   type PressableStateCallbackType,
   type StyleProp,
   type TextInputProps,
@@ -87,6 +88,30 @@ export function H3({ children, style }: TProps) {
           fontWeight: "600",
           fontSize: 16,
           lineHeight: 20,
+          marginBottom: 8,
+        },
+        style,
+      ]}
+    >
+      {children}
+    </Text>
+  );
+}
+
+/** Uppercase overline that opens a section or a spread card. */
+export function Overline({ children, style }: TProps) {
+  const t = useTheme();
+  return (
+    <Text
+      accessibilityRole="header"
+      style={[
+        {
+          fontFamily: t.fontBody,
+          fontSize: 12.5,
+          fontWeight: "600",
+          letterSpacing: 0.75,
+          textTransform: "uppercase",
+          color: t.inkSoft,
           marginBottom: 8,
         },
         style,
@@ -526,7 +551,11 @@ export const rowStyles = StyleSheet.create({
   filterRow: { flexDirection: "row", gap: 4.8, flexWrap: "wrap", alignItems: "center" },
 });
 
-/** Page container (.panel): centered column, max 720 wide. */
+/**
+ * Page container (.panel). Left-aligned against the pane's edge so content
+ * shares one grid with the header and the sidebar — a readable max width,
+ * never a column floating in the middle of the pane.
+ */
 export function Panel({
   children,
   wide = false,
@@ -536,15 +565,16 @@ export function Panel({
   wide?: boolean;
   style?: StyleProp<ViewStyle>;
 }) {
+  const { width } = useWindowDimensions();
   return (
     <View
       style={[
         {
-          maxWidth: wide ? 896 : 720,
+          maxWidth: wide ? 960 : 720,
           width: "100%",
-          alignSelf: "center",
+          alignSelf: "flex-start",
           paddingTop: 24,
-          paddingHorizontal: 17.6,
+          paddingHorizontal: width >= 900 ? 24 : 16,
           paddingBottom: 64,
         },
         style,

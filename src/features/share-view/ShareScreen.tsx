@@ -51,10 +51,10 @@ export function ShareScreen({ clientId, shareId }: { clientId: string; shareId: 
   return (
     <ScrollView style={{ flex: 1 }}>
       <Panel wide>
-        <H1>
+        <H1 style={{ marginBottom: 4 }}>
           {fmtDay(data.from)} → {fmtDay(data.to)}
         </H1>
-        <Hint>
+        <Hint style={{ marginBottom: 0 }}>
           {data.threads.length === 1 ? "1 thread" : `${data.threads.length} threads`} shared ·
           exported {fmtDay(data.exportedAt)}. Only what the client chose to share appears here.
         </Hint>
@@ -62,7 +62,7 @@ export function ShareScreen({ clientId, shareId }: { clientId: string; shareId: 
         {/* the timeline always stays */}
         <ShareTimeline share={data} selection={selection} onSelect={select} />
 
-        <View style={[rowStyles.filterRow, { marginTop: 14, marginBottom: 12 }]}>
+        <View style={[rowStyles.filterRow, { marginTop: 16, marginBottom: 16 }]}>
           <Chip
             label={selectedThread ? "Thread in focus" : "Overview"}
             pressed={tab === "overview"}

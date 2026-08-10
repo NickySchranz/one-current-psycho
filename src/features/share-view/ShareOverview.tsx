@@ -1,44 +1,17 @@
 /**
- * The whole share at a glance, spread into cards that sit side by side on
- * a wide screen and stack on a phone: every shared thread, the emotions
- * moving through the window, and the steps the client decided and took.
- * Everything tappable focuses the timeline above.
+ * The whole share at a glance, spread into balanced columns: every shared
+ * thread, the emotions moving through the window, and the steps the client
+ * decided and took. Everything tappable focuses the timeline above.
  */
 import { Pressable, View } from "react-native";
 import type { ShareExport, SharedEvent, SharedThread } from "@/domain/share-types";
 import { fmtDay } from "@/domain/dates";
-import { Card, Hint, T, Tag, rowStyles } from "@/ui/primitives";
+import { Card, Hint, Overline, T, Tag, rowStyles } from "@/ui/primitives";
+import { SpreadColumns, type SpreadCard } from "@/ui/SpreadColumns";
 import { useTheme } from "@/ui/theme";
 import { KIND_LABELS, kindColor } from "./kinds";
 import { isClosedThread, threadColor } from "./timeline/geometry";
 import type { Selection } from "./selection";
-
-export const spreadRow = {
-  flexDirection: "row" as const,
-  flexWrap: "wrap" as const,
-  gap: 10,
-  alignItems: "flex-start" as const,
-};
-export const spreadCell = { flexGrow: 1, flexBasis: 300, marginBottom: 0 };
-
-/** The uppercase overline a spread card opens with. */
-export function Overline({ children }: { children?: React.ReactNode }) {
-  const t = useTheme();
-  return (
-    <T
-      style={{
-        fontSize: 12.5,
-        fontWeight: "600",
-        letterSpacing: 0.75,
-        textTransform: "uppercase",
-        color: t.inkSoft,
-        marginBottom: 6,
-      }}
-    >
-      {children}
-    </T>
-  );
-}
 
 function loudnessNow(th: SharedThread): number {
   return th.loudness.length > 0 ? th.loudness[th.loudness.length - 1].loudness : 2;
@@ -90,6 +63,31 @@ function ThreadRow({
   );
 }
 
+function EmotionGroup({
+  label,
+  items,
+  quality = false,
+  first = false,
+}: {
+  label: string;
+  items: string[];
+  quality?: boolean;
+  first?: boolean;
+}) {
+  const t = useTheme();
+  if (items.length === 0) return null;
+  return (
+    <View style={{ marginTop: first ? 0 : 10 }}>
+      <T style={{ fontSize: 13.6, color: t.inkSoft }}>{label}</T>
+      <View style={[rowStyles.tagRow, { marginBottom: 0 }]}>
+        {items.map((f) => (
+          <Tag key={f} quality={quality} label={f} />
+        ))}
+      </View>
+    </View>
+  );
+}
+
 type Step = { thread: SharedThread; event: SharedEvent; index: number };
 
 export function ShareOverview({
@@ -128,79 +126,69 @@ export function ShareOverview({
     )
     .sort((a, b) => a.event.on.localeCompare(b.event.on));
 
-  const hasEmotions = held.length + felt.length + returned.length > 0;
-
-  return (
-    <View style={spreadRow}>
-      {/* every shared thread, loudest first, tappable */}
-      <Card style={spreadCell}>
-        <Overline>The threads</Overline>
-        {open.map((thr) => (
-          <ThreadRow
-            key={thr.id}
-            thread={thr}
-            onPress={() => onSelect({ type: "thread", threadId: thr.id })}
-          />
-        ))}
-        {closed.length > 0 && open.length > 0 && (
-          <Hint style={{ marginTop: 10, marginBottom: 0, fontSize: 12.8 }}>
-            Integrated inside this window
-          </Hint>
-        )}
-        {closed.map((thr) => (
-          <ThreadRow
-            key={thr.id}
-            thread={thr}
-            onPress={() => onSelect({ type: "thread", threadId: thr.id })}
-          />
-        ))}
-      </Card>
-
-      {/* the emotional weather of the window */}
-      {hasEmotions && (
-        <Card style={spreadCell}>
-          <Overline>Emotions in this window</Overline>
-          {held.length > 0 && (
-            <View>
-              <T style={{ fontSize: 13.6, color: t.inkSoft }}>
-                Held by the open threads
-              </T>
-              <View style={[rowStyles.tagRow, { marginBottom: 0 }]}>
-                {held.map((f) => (
-                  <Tag key={f} quality label={f} />
-                ))}
-              </View>
-            </View>
+  const cards: SpreadCard[] = [
+    {
+      key: "threads",
+      weight: 2 + open.length * 2 + closed.length * 2 + (closed.length > 0 ? 1 : 0),
+      node: (
+        <Card style={{ marginBottom: 0 }}>
+          <Overline>The threads</Overline>
+          {open.map((thr) => (
+            <ThreadRow
+              key={thr.id}
+              thread={thr}
+              onPress={() => onSelect({ type: "thread", threadId: thr.id })}
+            />
+          ))}
+          {closed.length > 0 && open.length > 0 && (
+            <Hint style={{ marginTop: 12, marginBottom: 0, fontSize: 12.8 }}>
+              Integrated inside this window
+            </Hint>
           )}
-          {felt.length > 0 && (
-            <View style={{ marginTop: held.length > 0 ? 10 : 0 }}>
-              <T style={{ fontSize: 13.6, color: t.inkSoft }}>
-                What the threads make them feel
-              </T>
-              <View style={[rowStyles.tagRow, { marginBottom: 0 }]}>
-                {felt.map((f) => (
-                  <Tag key={f} label={f} />
-                ))}
-              </View>
-            </View>
-          )}
-          {returned.length > 0 && (
-            <View style={{ marginTop: held.length + felt.length > 0 ? 10 : 0 }}>
-              <T style={{ fontSize: 13.6, color: t.inkSoft }}>
-                Given back by integrations and steps
-              </T>
-              <View style={[rowStyles.tagRow, { marginBottom: 0 }]}>
-                {returned.map((f) => (
-                  <Tag key={f} quality label={f} />
-                ))}
-              </View>
-            </View>
-          )}
+          {closed.map((thr) => (
+            <ThreadRow
+              key={thr.id}
+              thread={thr}
+              onPress={() => onSelect({ type: "thread", threadId: thr.id })}
+            />
+          ))}
         </Card>
-      )}
+      ),
+    },
+  ];
 
-      {/* every step decided or done, in order, tappable */}
-      <Card style={spreadCell}>
+  if (held.length + felt.length + returned.length > 0) {
+    cards.push({
+      key: "emotions",
+      weight:
+        2 +
+        [held, felt, returned].filter((g) => g.length > 0).length * 2 +
+        Math.ceil((held.length + felt.length + returned.length) / 3),
+      node: (
+        <Card style={{ marginBottom: 0 }}>
+          <Overline>Emotions in this window</Overline>
+          <EmotionGroup label="Held by the open threads" items={held} quality first />
+          <EmotionGroup
+            label="What the threads make them feel"
+            items={felt}
+            first={held.length === 0}
+          />
+          <EmotionGroup
+            label="Given back by integrations and steps"
+            items={returned}
+            quality
+            first={held.length + felt.length === 0}
+          />
+        </Card>
+      ),
+    });
+  }
+
+  cards.push({
+    key: "steps",
+    weight: 2 + Math.max(1, steps.length * 2),
+    node: (
+      <Card style={{ marginBottom: 0 }}>
         <Overline>Steps taken</Overline>
         {steps.length === 0 && (
           <Hint style={{ marginBottom: 0 }}>
@@ -209,7 +197,7 @@ export function ShareOverview({
         )}
         {steps.map((s, i) => (
           <Pressable
-            key={`${s.thread.id}-${s.index}-${i}`}
+            key={`${s.thread.id}-${s.index}`}
             accessibilityRole="button"
             accessibilityLabel={`${KIND_LABELS[s.event.kind]} on ${fmtDay(s.event.on)}`}
             onPress={() =>
@@ -219,7 +207,7 @@ export function ShareOverview({
               flexDirection: "row",
               alignItems: "flex-start",
               gap: 8,
-              marginTop: i === 0 ? 2 : 8,
+              marginTop: i === 0 ? 0 : 8,
               opacity: pressed ? 0.6 : 1,
             })}
           >
@@ -247,6 +235,8 @@ export function ShareOverview({
           </Pressable>
         ))}
       </Card>
-    </View>
-  );
+    ),
+  });
+
+  return <SpreadColumns cards={cards} />;
 }
