@@ -14,6 +14,7 @@ export function Header({ wide = false }: { wide?: boolean }) {
   const theme = useAppStore((s) => s.theme);
   const setTheme = useAppStore((s) => s.setTheme);
   const clients = useAppStore((s) => s.clients);
+  const logout = useAppStore((s) => s.logout);
 
   const client =
     view.kind !== "clients" ? clients.find((c) => c.id === view.clientId) : undefined;
@@ -68,6 +69,7 @@ export function Header({ wide = false }: { wide?: boolean }) {
         label={theme === "riverbed" ? "Dark" : "Light"}
         onPress={() => setTheme(theme === "riverbed" ? "duskwood" : "riverbed")}
       />
+      <Button variant="quiet" label="Sign out" onPress={() => void logout()} />
     </View>
   );
 }

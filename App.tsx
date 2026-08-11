@@ -9,6 +9,7 @@ import { ClientSidebar } from "@/features/clients/ClientSidebar";
 import { ClientDetailScreen } from "@/features/clients/ClientDetailScreen";
 import { ShareScreen } from "@/features/share-view/ShareScreen";
 import { ClientHistoryScreen } from "@/features/share-view/ClientHistoryScreen";
+import { AuthFlow } from "@/features/auth/AuthFlow";
 import { CalmNote, Hint } from "@/ui/primitives";
 import { useTheme } from "@/ui/theme";
 
@@ -31,6 +32,7 @@ function EmptyPane() {
 function AppShell() {
   const ready = useAppStore((s) => s.ready);
   const view = useAppStore((s) => s.view);
+  const user = useAppStore((s) => s.user);
   const init = useAppStore((s) => s.init);
   const tk = useTheme();
   const { width } = useWindowDimensions();
@@ -42,6 +44,15 @@ function AppShell() {
 
   if (!ready) {
     return <View accessibilityState={{ busy: true }} style={{ flex: 1, backgroundColor: tk.bg }} />;
+  }
+
+  if (!user) {
+    return (
+      <View style={{ flex: 1, backgroundColor: tk.bg }}>
+        <StatusBar style={tk.mode === "dark" ? "light" : "dark"} />
+        <AuthFlow />
+      </View>
+    );
   }
 
   const main = (

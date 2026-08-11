@@ -46,6 +46,16 @@ const check = (name, ok, detail = "") => {
   if (!ok) failed = true;
 };
 
+// 0. dummy login with the seeded demo account
+await page.getByLabel("Email").fill("demo@onecurrent.app");
+await page.getByLabel("Password", { exact: true }).fill("demo1234");
+await page.getByRole("button", { name: "Sign in" }).click();
+await page.waitForTimeout(600);
+check(
+  "demo login",
+  (await page.getByRole("button", { name: "Load example clients" }).count()) > 0,
+);
+
 // 1. load example clients
 await page.getByRole("button", { name: "Load example clients" }).click();
 await page.waitForTimeout(600);

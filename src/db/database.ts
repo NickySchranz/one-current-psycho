@@ -25,6 +25,19 @@ export type StoredShare = {
 };
 
 /**
+ * A local practitioner account. Dummy auth for now: accounts live only in
+ * this device's storage and the password is kept as-is — replace with a
+ * real auth backend before real accounts exist.
+ */
+export type Account = {
+  id: string;
+  name: string;
+  email: string;
+  password: string;
+  createdAt: string;
+};
+
+/**
  * A private note the psychologist keeps about a client. Notes live only
  * in this app's local storage and are never part of any share file.
  */
@@ -94,4 +107,5 @@ export const db = {
   clients: new Table<Client>("clients"),
   shares: new Table<StoredShare>("shares"),
   sessionNotes: new Table<SessionNote>("sessionNotes"),
+  accounts: new Table<Account>("accounts"),
 };

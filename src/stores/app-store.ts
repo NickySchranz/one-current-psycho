@@ -1,12 +1,19 @@
 import AsyncStorage from "@react-native-async-storage/async-storage";
 import { create } from "zustand";
-import { db, type Client, type SessionNote, type StoredShare } from "@/db/database";
+import { db, type Account, type Client, type SessionNote, type StoredShare } from "@/db/database";
 import { buildExampleData } from "@/db/example-data";
 import { newId } from "@/domain/ids";
 import type { ShareExport } from "@/domain/share-types";
 import { isThemeId, type ThemeId } from "@/ui/theme";
 
 const THEME_KEY = "one-current-psycho/theme";
+const SESSION_KEY = "one-current-psycho/session";
+
+/** Dummy auth: a ready-made account so the app can be tried right away. */
+export const DEMO_EMAIL = "demo@onecurrent.app";
+export const DEMO_PASSWORD = "demo1234";
+
+export type AuthUser = { name: string; email: string };
 
 export type View =
   | { kind: "clients" }
@@ -21,8 +28,17 @@ type AppState = {
   clients: Client[];
   shares: StoredShare[];
   sessionNotes: SessionNote[];
+  /** The signed-in practitioner, or null when the auth screens should show. */
+  user: AuthUser | null;
 
   init: () => Promise<void>;
+  /** Dummy auth against local accounts. Throws a readable Error. */
+  login: (email: string, password: string) => Promise<void>;
+  /** Creates a local account and signs it in. Throws a readable Error. */
+  register: (name: string, email: string, password: string) => Promise<void>;
+  /** Dummy reset: resolves without revealing whether the account exists. */
+  requestPasswordReset: (email: string) => Promise<void>;
+  logout: () => Promise<void>;
   setView: (view: View) => void;
   setTheme: (theme: ThemeId) => void;
   addClient: (name: string, notes?: string) => Promise<void>;
@@ -55,21 +71,87 @@ export const useAppStore = create<AppState>((set, get) => ({
   clients: [],
   shares: [],
   sessionNotes: [],
+  user: null,
 
   init: async () => {
-    const [clients, shares, sessionNotes, storedTheme] = await Promise.all([
-      db.clients.toArray(),
-      db.shares.toArray(),
-      db.sessionNotes.toArray(),
-      AsyncStorage.getItem(THEME_KEY),
-    ]);
+    const [clients, shares, sessionNotes, accounts, storedTheme, sessionEmail] =
+      await Promise.all([
+        db.clients.toArray(),
+        db.shares.toArray(),
+        db.sessionNotes.toArray(),
+        db.accounts.toArray(),
+        AsyncStorage.getItem(THEME_KEY),
+        AsyncStorage.getItem(SESSION_KEY),
+      ]);
+    if (accounts.length === 0) {
+      const demo: Account = {
+        id: newId("account"),
+        name: "Demo Practitioner",
+        email: DEMO_EMAIL,
+        password: DEMO_PASSWORD,
+        createdAt: new Date().toISOString(),
+      };
+      await db.accounts.put(demo);
+      accounts.push(demo);
+    }
+    const session = sessionEmail
+      ? accounts.find((a) => a.email === sessionEmail)
+      : undefined;
     set({
       ready: true,
       clients: clients.sort(byName),
       shares: shares.sort(byImportedDesc),
       sessionNotes: sessionNotes.sort(byNoteDateDesc),
+      user: session ? { name: session.name, email: session.email } : null,
       theme: storedTheme && isThemeId(storedTheme) ? storedTheme : "riverbed",
     });
+  },
+
+  login: async (email, password) => {
+    const norm = email.trim().toLowerCase();
+    const accounts = await db.accounts.toArray();
+    const account = accounts.find((a) => a.email.toLowerCase() === norm);
+    if (!account || account.password !== password) {
+      throw new Error("That email and password don't match.");
+    }
+    await AsyncStorage.setItem(SESSION_KEY, account.email);
+    set({ user: { name: account.name, email: account.email } });
+  },
+
+  register: async (name, email, password) => {
+    const cleanName = name.trim();
+    const cleanEmail = email.trim();
+    if (cleanName === "") throw new Error("Please tell us your name.");
+    if (!/^\S+@\S+\.\S+$/.test(cleanEmail)) {
+      throw new Error("That doesn't look like an email address.");
+    }
+    if (password.length < 8) {
+      throw new Error("Please use a password of at least 8 characters.");
+    }
+    const accounts = await db.accounts.toArray();
+    if (accounts.some((a) => a.email.toLowerCase() === cleanEmail.toLowerCase())) {
+      throw new Error("An account with this email already exists.");
+    }
+    const account: Account = {
+      id: newId("account"),
+      name: cleanName,
+      email: cleanEmail,
+      password,
+      createdAt: new Date().toISOString(),
+    };
+    await db.accounts.put(account);
+    await AsyncStorage.setItem(SESSION_KEY, account.email);
+    set({ user: { name: account.name, email: account.email } });
+  },
+
+  requestPasswordReset: async (email) => {
+    // Dummy: no mail goes out, and whether the account exists stays private.
+    if (email.trim() === "") throw new Error("Please enter your email address.");
+  },
+
+  logout: async () => {
+    await AsyncStorage.removeItem(SESSION_KEY);
+    set({ user: null, view: { kind: "clients" } });
   },
 
   setView: (view) => set({ view }),
