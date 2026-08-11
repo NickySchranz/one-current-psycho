@@ -1,5 +1,13 @@
 import AsyncStorage from "@react-native-async-storage/async-storage";
 import { create } from "zustand";
+import {
+  api,
+  ApiAuthError,
+  ApiHttpError,
+  ApiOfflineError,
+  loadTokens,
+  type ApiUser,
+} from "@/api/client";
 import { db, type Account, type Client, type SessionNote, type StoredShare } from "@/db/database";
 import { buildExampleData } from "@/db/example-data";
 import { newId } from "@/domain/ids";
@@ -30,13 +38,15 @@ type AppState = {
   sessionNotes: SessionNote[];
   /** The signed-in practitioner, or null when the auth screens should show. */
   user: AuthUser | null;
+  /** How the last sign-in happened — "local" means the server was unreachable. */
+  lastLoginMode: "api" | "local" | null;
 
   init: () => Promise<void>;
-  /** Dummy auth against local accounts. Throws a readable Error. */
+  /** API-first auth, falling back to local accounts when the server is unreachable. */
   login: (email: string, password: string) => Promise<void>;
-  /** Creates a local account and signs it in. Throws a readable Error. */
+  /** API-first registration with a local-account fallback. Throws a readable Error. */
   register: (name: string, email: string, password: string) => Promise<void>;
-  /** Dummy reset: resolves without revealing whether the account exists. */
+  /** Asks the server for a reset link; stays quiet about whether the account exists. */
   requestPasswordReset: (email: string) => Promise<void>;
   logout: () => Promise<void>;
   setView: (view: View) => void;
@@ -45,6 +55,8 @@ type AppState = {
   deleteClient: (id: string) => Promise<void>;
   /** Parse and store a share file's text for a client. Throws a readable Error. */
   importShare: (clientId: string, text: string) => Promise<void>;
+  /** Redeem a one-time share code against the API. Throws a readable Error. */
+  redeemShareCode: (clientId: string, code: string) => Promise<void>;
   deleteShare: (id: string) => Promise<void>;
   addSessionNote: (clientId: string, text: string, on?: string) => Promise<void>;
   updateSessionNote: (id: string, text: string) => Promise<void>;
@@ -64,6 +76,51 @@ function byNoteDateDesc(a: SessionNote, b: SessionNote): number {
   return (b.on ?? b.createdAt).localeCompare(a.on ?? a.createdAt);
 }
 
+/** Check that parsed JSON is a One Current share document. Throws a readable Error. */
+function asShareExport(data: unknown): ShareExport {
+  const share = data as ShareExport | null;
+  if (
+    share == null ||
+    share.app !== "one-current-share" ||
+    share.version !== 1 ||
+    !Array.isArray(share.threads)
+  ) {
+    throw new Error("That file is not a One Current share.");
+  }
+  return share;
+}
+
+/**
+ * Keep a local account row in step with an API sign-in so the stored
+ * session (an email) can be restored by init() on the next launch.
+ */
+async function upsertLocalAccount(user: ApiUser, password: string): Promise<Account> {
+  const accounts = await db.accounts.toArray();
+  const existing = accounts.find(
+    (a) => a.email.toLowerCase() === user.email.toLowerCase(),
+  );
+  const account: Account = existing
+    ? { ...existing, name: user.name || existing.name, password }
+    : {
+        id: newId("account"),
+        name: user.name || user.email,
+        email: user.email,
+        password,
+        createdAt: new Date().toISOString(),
+      };
+  await db.accounts.put(account);
+  return account;
+}
+
+/** Readable message for an API sign-in failure (no local fallback for these). */
+function loginErrorMessage(e: unknown): string {
+  if (e instanceof ApiHttpError) {
+    if (e.status === 401) return "That email and password don't match.";
+    if (e.code === "rate_limited") return "Too many attempts. Wait a moment and try again.";
+  }
+  return "That did not work. Try again in a moment.";
+}
+
 export const useAppStore = create<AppState>((set, get) => ({
   ready: false,
   theme: "riverbed",
@@ -72,6 +129,7 @@ export const useAppStore = create<AppState>((set, get) => ({
   shares: [],
   sessionNotes: [],
   user: null,
+  lastLoginMode: null,
 
   init: async () => {
     const [clients, shares, sessionNotes, accounts, storedTheme, sessionEmail] =
@@ -109,13 +167,36 @@ export const useAppStore = create<AppState>((set, get) => ({
 
   login: async (email, password) => {
     const norm = email.trim().toLowerCase();
+    let apiUser: ApiUser | null = null;
+    try {
+      apiUser = await api.login(norm, password);
+    } catch (e) {
+      if (!(e instanceof ApiOfflineError)) throw new Error(loginErrorMessage(e));
+    }
+    if (apiUser) {
+      if (!apiUser.roles.includes("practitioner")) {
+        void api.logout();
+        throw new Error("This account is not a practitioner account.");
+      }
+      const account = await upsertLocalAccount(apiUser, password);
+      await AsyncStorage.setItem(SESSION_KEY, account.email);
+      set({
+        user: { name: account.name, email: account.email },
+        lastLoginMode: "api",
+      });
+      return;
+    }
+    // Server unreachable — the local accounts still open the door.
     const accounts = await db.accounts.toArray();
     const account = accounts.find((a) => a.email.toLowerCase() === norm);
     if (!account || account.password !== password) {
       throw new Error("That email and password don't match.");
     }
     await AsyncStorage.setItem(SESSION_KEY, account.email);
-    set({ user: { name: account.name, email: account.email } });
+    set({
+      user: { name: account.name, email: account.email },
+      lastLoginMode: "local",
+    });
   },
 
   register: async (name, email, password) => {
@@ -128,6 +209,27 @@ export const useAppStore = create<AppState>((set, get) => ({
     if (password.length < 8) {
       throw new Error("Please use a password of at least 8 characters.");
     }
+    let apiUser: ApiUser | null = null;
+    try {
+      apiUser = await api.register(cleanEmail, password, cleanName);
+    } catch (e) {
+      if (!(e instanceof ApiOfflineError)) {
+        if (e instanceof ApiHttpError && e.code === "email_taken") {
+          throw new Error("An account with this email already exists.");
+        }
+        throw new Error("The account could not be created. Try again in a moment.");
+      }
+    }
+    if (apiUser) {
+      const account = await upsertLocalAccount(apiUser, password);
+      await AsyncStorage.setItem(SESSION_KEY, account.email);
+      set({
+        user: { name: account.name, email: account.email },
+        lastLoginMode: "api",
+      });
+      return;
+    }
+    // Server unreachable — create the account on this device only.
     const accounts = await db.accounts.toArray();
     if (accounts.some((a) => a.email.toLowerCase() === cleanEmail.toLowerCase())) {
       throw new Error("An account with this email already exists.");
@@ -141,17 +243,25 @@ export const useAppStore = create<AppState>((set, get) => ({
     };
     await db.accounts.put(account);
     await AsyncStorage.setItem(SESSION_KEY, account.email);
-    set({ user: { name: account.name, email: account.email } });
+    set({
+      user: { name: account.name, email: account.email },
+      lastLoginMode: "local",
+    });
   },
 
   requestPasswordReset: async (email) => {
-    // Dummy: no mail goes out, and whether the account exists stays private.
     if (email.trim() === "") throw new Error("Please enter your email address.");
+    try {
+      await api.forgotPassword(email.trim().toLowerCase());
+    } catch {
+      // Offline or server error: stay quiet, same as the enumeration-safe answer.
+    }
   },
 
   logout: async () => {
+    void api.logout();
     await AsyncStorage.removeItem(SESSION_KEY);
-    set({ user: null, view: { kind: "clients" } });
+    set({ user: null, view: { kind: "clients" }, lastLoginMode: null });
   },
 
   setView: (view) => set({ view }),
@@ -189,20 +299,46 @@ export const useAppStore = create<AppState>((set, get) => ({
   },
 
   importShare: async (clientId, text) => {
-    let data: ShareExport;
+    let parsed: unknown;
     try {
-      data = JSON.parse(text) as ShareExport;
+      parsed = JSON.parse(text);
     } catch {
       throw new Error("That file is not valid JSON.");
     }
-    if (
-      data == null ||
-      data.app !== "one-current-share" ||
-      data.version !== 1 ||
-      !Array.isArray(data.threads)
-    ) {
-      throw new Error("That file is not a One Current share.");
+    const data = asShareExport(parsed);
+    const share: StoredShare = {
+      id: newId("share"),
+      clientId,
+      importedAt: new Date().toISOString(),
+      data,
+    };
+    await db.shares.put(share);
+    set((s) => ({ shares: [share, ...s.shares].sort(byImportedDesc) }));
+  },
+
+  redeemShareCode: async (clientId, code) => {
+    if (!(await loadTokens())) {
+      throw new Error("Sign in while the server is reachable to redeem codes.");
     }
+    let document: unknown;
+    try {
+      ({ document } = await api.redeemShare(code.trim()));
+    } catch (e) {
+      if (e instanceof ApiOfflineError) {
+        throw new Error("The server could not be reached.");
+      }
+      if (e instanceof ApiHttpError && e.status === 404) {
+        throw new Error("That code doesn't work — it may have expired or been used already.");
+      }
+      if (e instanceof ApiHttpError && e.code === "rate_limited") {
+        throw new Error("Too many attempts. Wait a moment and try again.");
+      }
+      if (e instanceof ApiAuthError) {
+        throw new Error("Your session has expired — sign in again to redeem codes.");
+      }
+      throw new Error("The code could not be redeemed. Try again in a moment.");
+    }
+    const data = asShareExport(document);
     const share: StoredShare = {
       id: newId("share"),
       clientId,

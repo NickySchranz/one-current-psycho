@@ -23,6 +23,7 @@ export function ClientDetailScreen({ clientId }: { clientId: string }) {
   const shares = useAppStore((s) => s.shares).filter((sh) => sh.clientId === clientId);
   const setView = useAppStore((s) => s.setView);
   const importShare = useAppStore((s) => s.importShare);
+  const redeemShareCode = useAppStore((s) => s.redeemShareCode);
   const deleteShare = useAppStore((s) => s.deleteShare);
   const deleteClient = useAppStore((s) => s.deleteClient);
 
@@ -32,6 +33,11 @@ export function ClientDetailScreen({ clientId }: { clientId: string }) {
   // Native fallback: no file picker wired, so the share file is pasted as text.
   const [pasteOpen, setPasteOpen] = useState(false);
   const [pasteText, setPasteText] = useState("");
+  // Share codes handed over instead of a file.
+  const [code, setCode] = useState("");
+  const [codeError, setCodeError] = useState("");
+  const [codeOk, setCodeOk] = useState(false);
+  const [redeeming, setRedeeming] = useState(false);
 
   if (!client) {
     return (
@@ -52,6 +58,21 @@ export function ClientDetailScreen({ clientId }: { clientId: string }) {
       setPasteText("");
     } catch (e) {
       setError(e instanceof Error ? e.message : "The import failed.");
+    }
+  }
+
+  async function doRedeem() {
+    setRedeeming(true);
+    setCodeError("");
+    setCodeOk(false);
+    try {
+      await redeemShareCode(clientId, code);
+      setCode("");
+      setCodeOk(true);
+    } catch (e) {
+      setCodeError(e instanceof Error ? e.message : "The code could not be redeemed.");
+    } finally {
+      setRedeeming(false);
     }
   }
 
@@ -171,6 +192,43 @@ export function ClientDetailScreen({ clientId }: { clientId: string }) {
           )}
           {error !== "" && (
             <Hint style={{ color: t.danger, marginTop: 8, marginBottom: 0 }}>{error}</Hint>
+          )}
+        </Card>
+
+        <H2 style={{ marginTop: 8 }}>Or enter a share code</H2>
+        <Card>
+          <Hint>
+            Your client can also upload their share and hand you an 8-character code
+            instead of a file. Codes work once and expire after 14 days.
+          </Hint>
+          <View style={rowStyles.filterRow}>
+            <AppTextInput
+              value={code}
+              onChangeText={(v) => {
+                setCode(v);
+                setCodeOk(false);
+              }}
+              autoCapitalize="characters"
+              placeholder="e.g. 7KDQ2MWX"
+              accessibilityLabel="Share code"
+              style={{ maxWidth: 160 }}
+            />
+            <Button
+              variant="primary"
+              disabled={code.trim().length < 8 || redeeming}
+              label={redeeming ? "Redeeming…" : "Redeem"}
+              onPress={() => void doRedeem()}
+            />
+          </View>
+          {codeOk && (
+            <Hint style={{ marginTop: 8, marginBottom: 0 }}>
+              The share arrived — it is listed above with the other shared files.
+            </Hint>
+          )}
+          {codeError !== "" && (
+            <Hint style={{ color: t.danger, marginTop: 8, marginBottom: 0 }}>
+              {codeError}
+            </Hint>
           )}
         </Card>
 

@@ -139,5 +139,8 @@ if (existsSync(ROUNDTRIP)) {
 
 await browser.close();
 server.close();
-console.log(errors.length ? "ERRORS:\n" + errors.slice(0, 5).join("\n") : "no console errors");
-if (failed || errors.length) process.exit(1);
+// With no API running, the demo login's API-first attempt logs a connection
+// refusal before falling back to the local account — that is expected.
+const relevant = errors.filter((e) => !e.includes("ERR_CONNECTION_REFUSED"));
+console.log(relevant.length ? "ERRORS:\n" + relevant.slice(0, 5).join("\n") : "no console errors");
+if (failed || relevant.length) process.exit(1);

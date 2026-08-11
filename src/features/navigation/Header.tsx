@@ -15,6 +15,7 @@ export function Header({ wide = false }: { wide?: boolean }) {
   const setTheme = useAppStore((s) => s.setTheme);
   const clients = useAppStore((s) => s.clients);
   const logout = useAppStore((s) => s.logout);
+  const lastLoginMode = useAppStore((s) => s.lastLoginMode);
 
   const client =
     view.kind !== "clients" ? clients.find((c) => c.id === view.clientId) : undefined;
@@ -63,6 +64,22 @@ export function Header({ wide = false }: { wide?: boolean }) {
       >
         {title}
       </T>
+      {lastLoginMode === "local" && (
+        <T
+          style={{
+            fontSize: 11.5,
+            color: t.inkSoft,
+            borderWidth: 1,
+            borderColor: alpha(t.lineAxis, 0.55),
+            borderRadius: 999,
+            paddingHorizontal: 8,
+            paddingVertical: 2,
+            overflow: "hidden",
+          }}
+        >
+          Offline
+        </T>
+      )}
       <Button
         variant="quiet"
         accessibilityLabel="Switch theme"
