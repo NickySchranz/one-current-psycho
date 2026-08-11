@@ -31,8 +31,9 @@ export function makeDateScale(
     const frac = Math.min(1, Math.max(0, d / total));
     return left + frac * (right - left);
   };
-  // Weekly ticks; fortnightly when the window is long enough to crowd them.
-  const step = total > 70 ? 14 : 7;
+  // Weekly ticks; fortnightly, then four-weekly, when the window is long
+  // enough to crowd them (combined histories can span many months).
+  const step = total > 180 ? 28 : total > 70 ? 14 : 7;
   const ticks: { x: number; label: string }[] = [];
   const fromMs = Date.parse(from.slice(0, 10) + "T00:00:00Z");
   for (let d = 0; d <= total; d += step) {

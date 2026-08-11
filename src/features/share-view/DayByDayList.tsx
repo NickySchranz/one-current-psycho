@@ -2,7 +2,7 @@ import { useMemo } from "react";
 import { View } from "react-native";
 import type { ShareExport, SharedThread } from "@/domain/share-types";
 import { fmtDay } from "@/domain/dates";
-import { CalmNote, Card, Hint, Overline, T } from "@/ui/primitives";
+import { CalmNote, Card, Hint, Overline, T, Tag } from "@/ui/primitives";
 import { DayStrip, type DayStripEntry } from "./DayStrip";
 
 const DAY_MS = 24 * 60 * 60 * 1000;
@@ -39,7 +39,16 @@ function closedOn(thread: SharedThread, day: string): boolean {
 }
 
 /** Everything one recorded day left behind, under its own mini timeline. */
-function DaySection({ share, day }: { share: ShareExport; day: string }) {
+function DaySection({
+  share,
+  day,
+  isNew = false,
+}: {
+  share: ShareExport;
+  day: string;
+  /** The day is newer than the previously shared window. */
+  isNew?: boolean;
+}) {
   const from = share.from.slice(0, 10);
 
   // The day's standing, drawn the way the client app draws it.
@@ -85,7 +94,12 @@ function DaySection({ share, day }: { share: ShareExport; day: string }) {
 
   return (
     <View style={{ marginBottom: 8 }}>
-      <Overline style={{ marginTop: 16, marginBottom: 8 }}>{fmtDay(day)}</Overline>
+      <View
+        style={{ flexDirection: "row", alignItems: "center", gap: 8, marginTop: 16, marginBottom: 8 }}
+      >
+        <Overline style={{ marginTop: 0, marginBottom: 0 }}>{fmtDay(day)}</Overline>
+        {isNew && <Tag quality label="new" />}
+      </View>
 
       {entries.length > 0 && (
         <Card sunken style={{ gap: 4, marginBottom: 8 }}>
@@ -179,7 +193,14 @@ function DaySection({ share, day }: { share: ShareExport; day: string }) {
  * every open thread's pull, feelings and intensity, alive the way the
  * client sees them. Days that left no record fold into a quiet line.
  */
-export function DayByDayList({ share }: { share: ShareExport }) {
+export function DayByDayList({
+  share,
+  newSince,
+}: {
+  share: ShareExport;
+  /** Days after this one are marked as new since the last session. */
+  newSince?: string;
+}) {
   const from = share.from.slice(0, 10);
   const to = share.to.slice(0, 10);
 
@@ -221,7 +242,12 @@ export function DayByDayList({ share }: { share: ShareExport }) {
     <View>
       {blocks.map((block) =>
         block.kind === "day" ? (
-          <DaySection key={block.day} share={share} day={block.day} />
+          <DaySection
+            key={block.day}
+            share={share}
+            day={block.day}
+            isNew={newSince != null && block.day > newSince}
+          />
         ) : (
           <Hint key={block.from} style={{ marginTop: 12, marginBottom: 4, fontSize: 13.6 }}>
             {block.from === block.to

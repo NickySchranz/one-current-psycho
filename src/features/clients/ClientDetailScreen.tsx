@@ -14,6 +14,7 @@ import {
   rowStyles,
 } from "@/ui/primitives";
 import { useTheme } from "@/ui/theme";
+import { SessionNotes } from "./SessionNotes";
 
 /** One client: their shared files, plus importing a new file. */
 export function ClientDetailScreen({ clientId }: { clientId: string }) {
@@ -75,12 +76,33 @@ export function ClientDetailScreen({ clientId }: { clientId: string }) {
         <H1 style={{ marginBottom: 4 }}>{client.name}</H1>
         {client.notes ? <Hint style={{ marginBottom: 0 }}>{client.notes}</Hint> : null}
 
-        <H2 style={{ marginTop: 20 }}>Shared files</H2>
+        <SessionNotes clientId={clientId} />
+
+        <H2 style={{ marginTop: 8 }}>Shared files</H2>
         {shares.length === 0 && (
           <Card>
             <Hint style={{ marginBottom: 0 }}>
               Nothing shared yet. Import the file your client handed you.
             </Hint>
+          </Card>
+        )}
+        {shares.length > 1 && (
+          <Card>
+            <T style={{ fontWeight: "600" }}>
+              {fmtDay(shares.reduce((min, sh) => (sh.data.from < min ? sh.data.from : min), shares[0].data.from))}
+              {" → "}
+              {fmtDay(shares.reduce((max, sh) => (sh.data.to > max ? sh.data.to : max), shares[0].data.to))}
+            </T>
+            <T style={{ fontSize: 13.6, color: t.inkSoft, marginTop: 2 }}>
+              All {shares.length} shared files on one continuous timeline.
+            </T>
+            <View style={[rowStyles.filterRow, { marginTop: 10 }]}>
+              <Button
+                variant="primary"
+                label="View full history"
+                onPress={() => setView({ kind: "client-history", clientId })}
+              />
+            </View>
           </Card>
         )}
         {shares.map((sh) => (

@@ -24,6 +24,20 @@ export type StoredShare = {
   data: ShareExport;
 };
 
+/**
+ * A private note the psychologist keeps about a client. Notes live only
+ * in this app's local storage and are never part of any share file.
+ */
+export type SessionNote = {
+  id: string;
+  clientId: string;
+  /** ISO timestamp of when the note was written. */
+  createdAt: string;
+  /** ISO date of the session the note belongs to, if any. */
+  on?: string;
+  text: string;
+};
+
 export class Table<T extends { id: string }> {
   private cache: Map<string, T> | null = null;
   private writing: Promise<void> = Promise.resolve();
@@ -79,4 +93,5 @@ export class Table<T extends { id: string }> {
 export const db = {
   clients: new Table<Client>("clients"),
   shares: new Table<StoredShare>("shares"),
+  sessionNotes: new Table<SessionNote>("sessionNotes"),
 };

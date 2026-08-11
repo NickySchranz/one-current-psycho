@@ -16,9 +16,7 @@ export function Header({ wide = false }: { wide?: boolean }) {
   const clients = useAppStore((s) => s.clients);
 
   const client =
-    view.kind === "client" || view.kind === "share"
-      ? clients.find((c) => c.id === view.clientId)
-      : undefined;
+    view.kind !== "clients" ? clients.find((c) => c.id === view.clientId) : undefined;
   const title =
     view.kind === "clients"
       ? "One Current — Practice"
@@ -39,13 +37,13 @@ export function Header({ wide = false }: { wide?: boolean }) {
       }}
     >
       {/* Wide screens keep the client list on-screen — back only unwinds a share. */}
-      {view.kind !== "clients" && (!wide || view.kind === "share") && (
+      {view.kind !== "clients" && (!wide || view.kind !== "client") && (
         <Button
           variant="quiet"
           label="← Back"
           onPress={() =>
             setView(
-              view.kind === "share"
+              view.kind === "share" || view.kind === "client-history"
                 ? { kind: "client", clientId: view.clientId }
                 : { kind: "clients" },
             )

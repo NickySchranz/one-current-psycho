@@ -8,6 +8,7 @@ import { ClientListScreen } from "@/features/clients/ClientListScreen";
 import { ClientSidebar } from "@/features/clients/ClientSidebar";
 import { ClientDetailScreen } from "@/features/clients/ClientDetailScreen";
 import { ShareScreen } from "@/features/share-view/ShareScreen";
+import { ClientHistoryScreen } from "@/features/share-view/ClientHistoryScreen";
 import { CalmNote, Hint } from "@/ui/primitives";
 import { useTheme } from "@/ui/theme";
 
@@ -47,6 +48,7 @@ function AppShell() {
     <>
       {view.kind === "client" && <ClientDetailScreen clientId={view.clientId} />}
       {view.kind === "share" && <ShareScreen clientId={view.clientId} shareId={view.shareId} />}
+      {view.kind === "client-history" && <ClientHistoryScreen clientId={view.clientId} />}
     </>
   );
 
