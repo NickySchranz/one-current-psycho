@@ -11,6 +11,10 @@
     "android": {
       "predictiveBackGestureEnabled": false
     },
-    "web": {}
+    "web": {
+      "bundler": "metro",
+      "output": "single",
+      "baseUrl": "/one-current-psycho"
+    }
   }
 }
