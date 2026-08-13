@@ -1,37 +1,20 @@
 /**
- * One focused thread, spread into cards that sit side by side on a wide
- * screen and stack on a phone: the thread itself, everything it holds
- * emotionally, and the full record of what happened on it. The selected
- * event opens full width underneath.
+ * One thread's full story, rendered as a vertical stack inside the thread
+ * list. No separate navigation — the detail expands inline below its row.
+ * Sections are separated by thin dividers: identity, beliefs, emotions,
+ * what happened (with inline event detail), and waiting container.
  */
 import { Pressable, View } from "react-native";
 import type { SharedEvent, SharedThread } from "@/domain/share-types";
 import { fmtDay } from "@/domain/dates";
-import { Button, Card, Hint, Overline, T, Tag, rowStyles } from "@/ui/primitives";
-import { SpreadColumns, type SpreadCard } from "@/ui/SpreadColumns";
+import { Button, Hint, T, Tag, rowStyles } from "@/ui/primitives";
 import { useTheme } from "@/ui/theme";
 import { KIND_LABELS, kindColor } from "./kinds";
 import { isClosedThread, threadColor } from "./timeline/geometry";
 import { EventDetailCard } from "./timeline/EventDetailCard";
 import type { Selection } from "./selection";
 
-/** One line of the thread's record: what happened, when. */
-function eventSummary(event: SharedEvent): string {
-  switch (event.kind) {
-    case "started":
-      return "The thread began pulling";
-    case "moment":
-      return event.title;
-    case "action-decided":
-      return `Decided: ${event.title}`;
-    case "action-done":
-      return `Done: ${event.title}`;
-    case "integrated":
-      return event.result === "converted-to-project"
-        ? "Became real work and left their head"
-        : "Folded back into their one line";
-  }
-}
+/* ---------- small helpers ---------- */
 
 function Row({ label, value }: { label: string; value?: string }) {
   const t = useTheme();
@@ -67,13 +50,76 @@ function TagRow({
   );
 }
 
+function Divider() {
+  const t = useTheme();
+  return (
+    <View
+      style={{
+        borderTopWidth: 1,
+        borderTopColor: t.lineAxis,
+        marginTop: 16,
+        marginBottom: 16,
+      }}
+    />
+  );
+}
+
+/** Builds a natural-language sentence from the thread's emotional landscape. */
+function EmotionalSummary({
+  thread,
+  closed,
+}: {
+  thread: SharedThread;
+  closed: boolean;
+}) {
+  const parts: string[] = [];
+  if (thread.feelings && thread.feelings.length > 0) {
+    parts.push(
+      `${closed ? "held" : "holds"} ${thread.feelings.join(" and ")}`,
+    );
+  }
+  if (thread.anxieties && thread.anxieties.length > 0) {
+    parts.push(`makes them feel ${thread.anxieties.join(" and ")}`);
+  }
+  if (thread.needs && thread.needs.length > 0) {
+    parts.push(
+      `${thread.needs.length === 1 ? "need" : "needs"}: ${thread.needs.join(", ")}`,
+    );
+  }
+  if (parts.length === 0) return null;
+  const sentence = `This thread ${parts.join(", ")}.`;
+  return (
+    <Hint style={{ marginBottom: 4, fontStyle: "italic" }}>
+      {sentence}
+    </Hint>
+  );
+}
+
+function eventSummary(event: SharedEvent): string {
+  switch (event.kind) {
+    case "started":
+      return "The thread began pulling";
+    case "moment":
+      return event.title;
+    case "action-decided":
+      return `Decided: ${event.title}`;
+    case "action-done":
+      return `Done: ${event.title}`;
+    case "integrated":
+      return event.result === "converted-to-project"
+        ? "Became real work and left their head"
+        : "Folded back into their one line";
+  }
+}
+
+/* ---------- main component ---------- */
+
 export function ThreadDetail({
   thread,
   eventIndex,
   onSelect,
 }: {
   thread: SharedThread;
-  /** The event held open, if a dot or a record line was tapped. */
   eventIndex: number | null;
   onSelect: (s: Selection | null) => void;
 }) {
@@ -83,211 +129,237 @@ export function ThreadDetail({
   const w = thread.waiting;
   const event = eventIndex != null ? thread.events[eventIndex] : undefined;
 
-  const holdsAnything =
+  const hasEmotions =
     (thread.feelings?.length ?? 0) > 0 ||
     (thread.anxieties?.length ?? 0) > 0 ||
     (thread.needs?.length ?? 0) > 0 ||
-    (thread.qualitiesReclaimed?.length ?? 0) > 0 ||
-    !!w;
+    (thread.qualitiesReclaimed?.length ?? 0) > 0;
 
-  const tagSections = [
-    thread.feelings,
-    thread.anxieties,
-    thread.needs,
-    thread.qualitiesReclaimed,
-  ].filter((items) => (items?.length ?? 0) > 0).length;
-  const infoRows = [
-    thread.description,
-    thread.startedOn,
-    thread.integratedOn,
-    thread.controllability,
-    thread.originalBelief,
-    thread.currentBelief,
-  ].filter(Boolean).length;
-
-  const cards: SpreadCard[] = [
-    {
-      key: "thread",
-      weight: 4 + infoRows,
-      node: (
-        <Card style={{ marginBottom: 0 }}>
-          <Overline>The thread</Overline>
-          <View style={{ flexDirection: "row", alignItems: "center", gap: 8 }}>
-            <View
-              style={{ width: 10, height: 10, borderRadius: 5, backgroundColor: color }}
-            />
-            <T style={{ fontWeight: "600", flexShrink: 1 }}>{thread.title}</T>
-          </View>
-          <Hint style={{ marginTop: 4, marginBottom: 0 }}>
-            {thread.kind}
-            {thread.orientation && thread.orientation !== thread.kind
-              ? ` · points at the ${thread.orientation}`
-              : ""}
-            {` · ${thread.status}`}
-            {(thread.returnedCount ?? 0) > 0
-              ? ` · returned ${thread.returnedCount === 1 ? "once" : `${thread.returnedCount} times`}`
-              : ""}
-          </Hint>
-          {thread.description ? (
-            <Hint style={{ marginTop: 6, marginBottom: 0 }}>{thread.description}</Hint>
-          ) : null}
-          <Row
-            label="Began"
-            value={
-              thread.startedLabel
-                ? `${thread.startedLabel} (${fmtDay(thread.startedOn)})`
-                : fmtDay(thread.startedOn)
-            }
-          />
-          {thread.integratedOn ? (
-            <Row label="Integrated" value={fmtDay(thread.integratedOn)} />
-          ) : null}
-          <Row label="Controllability" value={thread.controllability} />
-          <Row label="Original belief" value={thread.originalBelief} />
-          <Row label="Belief now" value={thread.currentBelief} />
-        </Card>
-      ),
-    },
-  ];
-
-  // everything it holds emotionally
-  if (holdsAnything) {
-    cards.push({
-      key: "holds",
-      weight: 2 + tagSections * 2 + (w ? 6 : 0),
-      node: (
-        <Card style={{ marginBottom: 0 }}>
-          <Overline>What it holds</Overline>
-            <TagRow
-              label={closed ? "Feelings it held while open" : "Feelings it holds"}
-              items={thread.feelings}
-              quality
-            />
-            <TagRow label="What it makes them feel" items={thread.anxieties} />
-            <TagRow label="Needs underneath" items={thread.needs} />
-            <TagRow
-              label={closed ? "Qualities reclaimed" : "Qualities stored inside it"}
-              items={thread.qualitiesReclaimed}
-              quality
-            />
-            {w ? (
-              <View
-                style={{
-                  marginTop: 10,
-                  paddingTop: 10,
-                  borderTopWidth: 1,
-                  borderTopColor: t.lineAxis,
-                }}
-              >
-                <T style={{ fontWeight: "600", fontSize: 14.7 }}>
-                  Waiting{w.closedAt ? ` — closed ${fmtDay(w.closedAt)}` : ""}
-                </T>
-                <Row label="Awaiting" value={w.awaiting} />
-                <Row label="Action already taken" value={w.actionTaken} />
-                {w.reviewDate ? (
-                  <Row label="Next review" value={fmtDay(w.reviewDate)} />
-                ) : null}
-                <TagRow label="Outside their control" items={w.outsideControl} />
-                <TagRow label="Would reopen it earlier" items={w.reopenConditions} />
-                <TagRow label="Living on meanwhile" items={w.continueMeanwhile} />
-                <TagRow label="Reclaimed already" items={w.reclaimedNow} quality />
-              </View>
-            ) : null}
-        </Card>
-      ),
-    });
-  }
-
-  // the full record inside the shared window
-  cards.push({
-    key: "record",
-    weight: 3 + Math.max(1, thread.events.length) * 2,
-    node: (
-        <Card style={{ marginBottom: 0 }}>
-          <Overline>What happened</Overline>
-          {thread.events.length === 0 && (
-            <Hint style={{ marginBottom: 0 }}>
-              Nothing was recorded on this thread inside the window.
-            </Hint>
-          )}
-          {thread.events.map((e, index) => {
-            const selected = index === eventIndex;
-            return (
-              <Pressable
-                key={index}
-                accessibilityRole="button"
-                accessibilityLabel={`${KIND_LABELS[e.kind]} on ${fmtDay(e.on)}`}
-                onPress={() =>
-                  onSelect(
-                    selected
-                      ? { type: "thread", threadId: thread.id }
-                      : { type: "event", threadId: thread.id, index },
-                  )
-                }
-                style={({ pressed }) => ({
-                  flexDirection: "row",
-                  alignItems: "flex-start",
-                  gap: 8,
-                  marginTop: index === 0 ? 2 : 7,
-                  opacity: pressed ? 0.6 : 1,
-                })}
-              >
-                <View
-                  style={{
-                    width: 8,
-                    height: 8,
-                    borderRadius: 4,
-                    marginTop: 5,
-                    backgroundColor: kindColor(e.kind, t),
-                  }}
-                />
-                <View style={{ flex: 1 }}>
-                  <T
-                    style={{
-                      fontSize: 14.2,
-                      fontWeight: selected ? "700" : "400",
-                    }}
-                  >
-                    {eventSummary(e)}
-                  </T>
-                  <Hint style={{ marginTop: 1, marginBottom: 0, fontSize: 12.8 }}>
-                    {fmtDay(e.on)} · {KIND_LABELS[e.kind]}
-                    {e.kind === "moment" && e.impact != null
-                      ? ` · felt impact ${e.impact}/5`
-                      : ""}
-                    {e.kind === "action-decided" && e.durationMinutes
-                      ? ` · about ${e.durationMinutes} min`
-                      : ""}
-                  </Hint>
-                </View>
-              </Pressable>
-            );
-          })}
-          {thread.events.length > 0 && (
-            <Hint style={{ marginTop: 8, marginBottom: 0, fontSize: 12.8 }}>
-              Tap a line for its full detail.
-            </Hint>
-          )}
-        </Card>
-    ),
-  });
+  const hasBeliefs = !!thread.originalBelief || !!thread.currentBelief;
 
   return (
-    <View>
-      <View style={{ flexDirection: "row", marginBottom: 12, marginLeft: -12 }}>
-        <Button
-          label="← All shared threads"
-          variant="quiet"
-          onPress={() => onSelect(null)}
-        />
+    <View
+      style={{
+        paddingHorizontal: 16,
+        paddingTop: 4,
+        paddingBottom: 16,
+        marginLeft: 20,
+        borderLeftWidth: 2,
+        borderLeftColor: color,
+      }}
+    >
+      {/* ── Section A: Identity ── */}
+      <View style={{ flexDirection: "row", alignItems: "center", gap: 8, marginBottom: 4 }}>
+        <View style={{ width: 10, height: 10, borderRadius: 5, backgroundColor: color }} />
+        <T style={{ fontWeight: "600", flexShrink: 1 }}>{thread.title}</T>
       </View>
 
-      <SpreadColumns cards={cards} />
-
-      {/* the selected event, spelled out full width */}
-      {event ? (
-        <EventDetailCard thread={thread} event={event} style={{ marginTop: 12, marginBottom: 0 }} />
+      {thread.description ? (
+        <Hint style={{ marginTop: 2, marginBottom: 0 }}>{thread.description}</Hint>
       ) : null}
+
+      <Hint style={{ marginTop: 4, marginBottom: 0, fontSize: 13.2 }}>
+        {thread.kind}
+        {thread.orientation && thread.orientation !== thread.kind
+          ? ` · points at the ${thread.orientation}`
+          : ""}
+        {` · ${thread.status}`}
+        {thread.controllability ? ` · ${thread.controllability}` : ""}
+        {(thread.returnedCount ?? 0) > 0
+          ? ` · returned ${thread.returnedCount === 1 ? "once" : `${thread.returnedCount} times`}`
+          : ""}
+      </Hint>
+
+      <Row
+        label="Began"
+        value={
+          thread.startedLabel
+            ? `${thread.startedLabel} (${fmtDay(thread.startedOn)})`
+            : fmtDay(thread.startedOn)
+        }
+      />
+      {thread.integratedOn ? <Row label="Integrated" value={fmtDay(thread.integratedOn)} /> : null}
+
+      {/* ── Section B: Belief shift ── */}
+      {hasBeliefs && (
+        <>
+          <Divider />
+          {thread.originalBelief && (
+            <T style={{ fontSize: 14.7, color: t.inkSoft, fontStyle: "italic" }}>
+              "{thread.originalBelief}"
+            </T>
+          )}
+          {thread.originalBelief && thread.currentBelief && (
+            <T
+              style={{
+                fontSize: 14,
+                color: t.inkFaint,
+                textAlign: "center",
+                marginVertical: 6,
+              }}
+            >
+              ↓
+            </T>
+          )}
+          {thread.currentBelief && (
+            <T style={{ fontSize: 14.7, fontWeight: "600", fontStyle: "italic" }}>
+              "{thread.currentBelief}"
+            </T>
+          )}
+        </>
+      )}
+
+      {/* ── Section C: What it holds ── */}
+      {hasEmotions && (
+        <>
+          <Divider />
+          <EmotionalSummary thread={thread} closed={closed} />
+          <TagRow
+            label={closed ? "Feelings it held while open" : "Feelings it holds"}
+            items={thread.feelings}
+            quality
+          />
+          <TagRow label="What it makes them feel" items={thread.anxieties} />
+          <TagRow label="Needs underneath" items={thread.needs} />
+          <TagRow
+            label={closed ? "Qualities reclaimed" : "Qualities stored inside it"}
+            items={thread.qualitiesReclaimed}
+            quality
+          />
+        </>
+      )}
+
+      {/* ── Section D: What happened ── */}
+      {thread.events.length > 0 && (
+        <>
+          <Divider />
+          <T style={{ fontSize: 13.6, color: t.inkSoft, marginBottom: 6 }}>What happened</T>
+          {thread.events.map((e, index) => {
+            const selected = index === eventIndex;
+            const isLast = index === thread.events.length - 1;
+
+            // Step pairing: if action-done matches a preceding action-decided title
+            const paired =
+              e.kind === "action-done" &&
+              thread.events.some(
+                (prev, pi) =>
+                  pi < index && prev.kind === "action-decided" && prev.title === e.title,
+              );
+
+            return (
+              <View key={index}>
+                <Pressable
+                  accessibilityRole="button"
+                  accessibilityLabel={`${KIND_LABELS[e.kind]} on ${fmtDay(e.on)}`}
+                  onPress={() =>
+                    onSelect(
+                      selected
+                        ? { type: "thread", threadId: thread.id }
+                        : { type: "event", threadId: thread.id, index },
+                    )
+                  }
+                  style={({ pressed }) => ({
+                    flexDirection: "row",
+                    alignItems: "flex-start",
+                    gap: 8,
+                    opacity: pressed ? 0.6 : 1,
+                  })}
+                >
+                  {/* dot with connecting line to next event */}
+                  <View style={{ alignItems: "center", width: 8 }}>
+                    {/* connecting line from previous dot */}
+                    {index > 0 && (
+                      <View
+                        style={{
+                          width: 1,
+                          height: 6,
+                          backgroundColor: t.lineAxis,
+                        }}
+                      />
+                    )}
+                    <View
+                      style={{
+                        width: 8,
+                        height: 8,
+                        borderRadius: 4,
+                        backgroundColor: kindColor(e.kind, t),
+                      }}
+                    />
+                    {/* connecting line to next dot */}
+                    {!isLast && (
+                      <View
+                        style={{
+                          width: 1,
+                          flex: 1,
+                          minHeight: 8,
+                          backgroundColor: t.lineAxis,
+                        }}
+                      />
+                    )}
+                  </View>
+                  <View style={{ flex: 1, paddingBottom: isLast ? 0 : 6 }}>
+                    <T
+                      style={{
+                        fontSize: 14.2,
+                        fontWeight: selected ? "700" : "400",
+                      }}
+                    >
+                      {paired ? `${e.title} ✓` : eventSummary(e)}
+                    </T>
+                    <Hint style={{ marginTop: 1, marginBottom: 0, fontSize: 12.8 }}>
+                      {fmtDay(e.on)}
+                      {paired
+                        ? " · step completed"
+                        : ` · ${KIND_LABELS[e.kind]}`}
+                      {e.kind === "moment" && e.impact != null
+                        ? ` · felt impact ${e.impact}/5`
+                        : ""}
+                      {e.kind === "action-decided" && e.durationMinutes
+                        ? ` · about ${e.durationMinutes} min`
+                        : ""}
+                    </Hint>
+                  </View>
+                </Pressable>
+                {/* inline event detail directly below the tapped event */}
+                {selected && event && (
+                  <EventDetailCard
+                    thread={thread}
+                    event={event}
+                    style={{ marginTop: 8, marginBottom: 4, marginLeft: 16 }}
+                  />
+                )}
+              </View>
+            );
+          })}
+        </>
+      )}
+
+      {/* ── Section E: Waiting ── */}
+      {w && (
+        <>
+          <Divider />
+          <T style={{ fontWeight: "600", fontSize: 14.7 }}>
+            Waiting{w.closedAt ? ` — closed ${fmtDay(w.closedAt)}` : ""}
+          </T>
+          <Row label="Awaiting" value={w.awaiting} />
+          <Row label="Action already taken" value={w.actionTaken} />
+          {w.reviewDate ? <Row label="Next review" value={fmtDay(w.reviewDate)} /> : null}
+          <TagRow label="Outside their control" items={w.outsideControl} />
+          <TagRow label="Would reopen it earlier" items={w.reopenConditions} />
+          <TagRow label="Living on meanwhile" items={w.continueMeanwhile} />
+          <TagRow label="Reclaimed already" items={w.reclaimedNow} quality />
+        </>
+      )}
+
+      {/* collapse button */}
+      <View style={{ marginTop: 16 }}>
+        <Button
+          variant="quiet"
+          label="Collapse"
+          onPress={() => onSelect(null)}
+          style={{ alignSelf: "flex-start" }}
+        />
+      </View>
     </View>
   );
 }

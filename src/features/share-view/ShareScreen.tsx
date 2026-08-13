@@ -3,20 +3,39 @@ import { ScrollView, View } from "react-native";
 import { useAppStore } from "@/stores/app-store";
 import type { ShareExport } from "@/domain/share-types";
 import { fmtDay } from "@/domain/dates";
-import { Button, CalmNote, Chip, H1, Hint, Panel, T, rowStyles } from "@/ui/primitives";
+import { Button, CalmNote, Disclosure, H1, Hint, Panel, T } from "@/ui/primitives";
 import { DayByDayList } from "./DayByDayList";
-import { ShareOverview } from "./ShareOverview";
-import { ThreadDetail } from "./ThreadDetail";
+import { SharePulse } from "./SharePulse";
+import { ThreadList } from "./ThreadList";
 import { ShareTimeline } from "./timeline/ShareTimeline";
 import { previousShareTo, whatsNew } from "./whats-new";
 import type { Selection } from "./selection";
 
+const DAY_MS = 24 * 60 * 60 * 1000;
+
+function windowWeeks(from: string, to: string): number {
+  const ms = Date.parse(to + "T00:00:00Z") - Date.parse(from + "T00:00:00Z");
+  return Math.max(1, Math.round(ms / DAY_MS / 7));
+}
+
+function recordedDayCount(share: ShareExport): number {
+  const from = share.from.slice(0, 10);
+  const days = new Set<string>();
+  for (const th of share.threads) {
+    for (const e of th.events) days.add(e.on.slice(0, 10));
+    for (const l of th.loudness) {
+      const d = l.at.slice(0, 10);
+      if (d >= from) days.add(d);
+    }
+  }
+  return days.size;
+}
+
 /**
- * One share's content. The summarized timeline always stays on top — it is
- * the shared language between client and psychologist. Below it, the
- * content follows the focus: an overview spread when nothing is held,
- * the focused thread's spread when a line is tapped, and the day-by-day
- * record on its own tab.
+ * One share's content. The pulse leads — what's pulling hardest, at a
+ * glance. Below it, every thread in a scannable list that expands inline.
+ * The timeline and day-by-day record stay available behind disclosures:
+ * always reachable, never overwhelming on first open.
  */
 export function ShareView({
   data,
@@ -24,12 +43,9 @@ export function ShareView({
   subtitle,
 }: {
   data: ShareExport;
-  /** Day after which events count as new since the last session, if known. */
   newSince?: string | null;
-  /** Replaces the default "exported …" line under the heading. */
   subtitle?: string;
 }) {
-  const [tab, setTab] = useState<"overview" | "days">("overview");
   const [selection, setSelection] = useState<Selection | null>(null);
 
   const fresh = useMemo(
@@ -37,15 +53,9 @@ export function ShareView({
     [data, newSince],
   );
 
-  /** Tapping the timeline pulls the content below back to the focus. */
   const select = (s: Selection | null) => {
     setSelection(s);
-    if (s) setTab("overview");
   };
-
-  const selectedThread = selection
-    ? data.threads.find((th) => th.id === selection.threadId)
-    : undefined;
 
   return (
     <ScrollView style={{ flex: 1 }}>
@@ -73,29 +83,31 @@ export function ShareView({
           )
         ) : null}
 
-        {/* the timeline always stays */}
-        <ShareTimeline share={data} selection={selection} onSelect={select} />
+        {/* the pulse: at-a-glance loudness summary */}
+        <SharePulse share={data} onSelect={select} />
 
-        <View style={[rowStyles.filterRow, { marginTop: 16, marginBottom: 16 }]}>
-          <Chip
-            label={selectedThread ? "Thread in focus" : "Overview"}
-            pressed={tab === "overview"}
-            onPress={() => setTab("overview")}
-          />
-          <Chip label="Day by day" pressed={tab === "days"} onPress={() => setTab("days")} />
+        {/* timeline behind a disclosure */}
+        <Disclosure
+          label={`Timeline — ${data.threads.length} thread${data.threads.length === 1 ? "" : "s"} across ${windowWeeks(data.from, data.to)} week${windowWeeks(data.from, data.to) === 1 ? "" : "s"}`}
+        >
+          <ShareTimeline share={data} selection={selection} onSelect={select} />
+          <Hint style={{ marginTop: 4, marginBottom: 0 }}>
+            Louder threads sit further from the main line, draw heavier and tremble.
+            Tap a line for the thread, a dot for what happened there.
+          </Hint>
+        </Disclosure>
+
+        {/* every thread, expandable in place */}
+        <View style={{ marginTop: 20 }}>
+          <ThreadList share={data} selection={selection} onSelect={select} />
         </View>
 
-        {tab === "days" ? (
+        {/* day by day behind a disclosure */}
+        <Disclosure
+          label={`Day by day — ${recordedDayCount(data)} recorded day${recordedDayCount(data) === 1 ? "" : "s"}`}
+        >
           <DayByDayList share={data} newSince={newSince ?? undefined} />
-        ) : selectedThread ? (
-          <ThreadDetail
-            thread={selectedThread}
-            eventIndex={selection?.type === "event" ? selection.index : null}
-            onSelect={select}
-          />
-        ) : (
-          <ShareOverview share={data} onSelect={select} />
-        )}
+        </Disclosure>
       </Panel>
     </ScrollView>
   );

@@ -543,6 +543,54 @@ export function CalmNote({
   );
 }
 
+/* ---------- disclosure ---------- */
+
+/** Collapsible section with an overline label and toggle indicator. */
+export function Disclosure({
+  label,
+  children,
+  defaultOpen = false,
+}: {
+  label: string;
+  children?: React.ReactNode;
+  defaultOpen?: boolean;
+}) {
+  const [open, setOpen] = React.useState(defaultOpen);
+  const t = useTheme();
+  return (
+    <View style={{ marginTop: 20 }}>
+      <Pressable
+        accessibilityRole="button"
+        accessibilityState={{ expanded: open }}
+        accessibilityLabel={label}
+        onPress={() => setOpen((v) => !v)}
+        style={{
+          flexDirection: "row",
+          alignItems: "center",
+          gap: 6,
+        }}
+      >
+        <Text
+          style={{
+            fontFamily: t.fontBody,
+            fontSize: 12.5,
+            fontWeight: "600",
+            letterSpacing: 0.75,
+            textTransform: "uppercase",
+            color: t.inkSoft,
+          }}
+        >
+          {label}
+        </Text>
+        <Text style={{ fontFamily: t.fontBody, fontSize: 12, color: t.inkFaint }}>
+          {open ? "▾" : "▸"}
+        </Text>
+      </Pressable>
+      {open && <View style={{ marginTop: 8 }}>{children}</View>}
+    </View>
+  );
+}
+
 /* ---------- layout helpers ---------- */
 
 export const rowStyles = StyleSheet.create({

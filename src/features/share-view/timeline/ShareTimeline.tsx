@@ -304,10 +304,7 @@ export function ShareTimeline({
         ) : (
           chart
         ))}
-      <Hint style={{ marginTop: 4, marginBottom: 0 }}>
-        Louder threads sit further from the main line, draw heavier and tremble. Tap a line
-        for the thread, a dot for what happened there.
-      </Hint>
+      {/* Hint text now rendered by the parent Disclosure wrapper */}
     </View>
   );
 }
