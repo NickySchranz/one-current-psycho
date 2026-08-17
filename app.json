@@ -13,7 +13,9 @@
     },
     "web": {
       "bundler": "metro",
-      "output": "single",
+      "output": "single"
+    },
+    "experiments": {
       "baseUrl": "/one-current-psycho"
     }
   }
