@@ -41,6 +41,11 @@ type AppState = {
   user: AuthUser | null;
   /** How the last sign-in happened — "local" means the server was unreachable. */
   lastLoginMode: "api" | "local" | null;
+  /**
+   * A registration (or sign-in) waiting on the emailed verification code.
+   * The password is kept so the local account can be created after verify.
+   */
+  pendingVerification: { email: string; password: string } | null;
   /** Shares patients addressed to this practitioner, waiting to be accepted. */
   inbox: InboxShare[];
   inboxStatus: "idle" | "loading" | "error";
@@ -50,8 +55,16 @@ type AppState = {
   login: (email: string, password: string) => Promise<void>;
   /** API-first registration with a local-account fallback. Throws a readable Error. */
   register: (name: string, email: string, password: string) => Promise<void>;
-  /** Asks the server for a reset link; stays quiet about whether the account exists. */
+  /** Trade the emailed code for a session and finish signing in. Throws a readable Error. */
+  verifyEmail: (code: string) => Promise<void>;
+  /** Ask the server to email a fresh verification code. Quiet on failure. */
+  resendVerification: () => Promise<void>;
+  /** Abandon the verification screen and go back to sign-in. */
+  cancelVerification: () => void;
+  /** Asks the server for a reset code; stays quiet about whether the account exists. */
   requestPasswordReset: (email: string) => Promise<void>;
+  /** Set a new password with the emailed reset code. Throws a readable Error. */
+  completePasswordReset: (token: string, newPassword: string) => Promise<void>;
   logout: () => Promise<void>;
   setView: (view: View) => void;
   setTheme: (theme: ThemeId) => void;
@@ -138,6 +151,7 @@ export const useAppStore = create<AppState>((set, get) => ({
   sessionNotes: [],
   user: null,
   lastLoginMode: null,
+  pendingVerification: null,
   inbox: [],
   inboxStatus: "idle",
 
@@ -182,6 +196,11 @@ export const useAppStore = create<AppState>((set, get) => ({
     try {
       apiUser = await api.login(norm, password);
     } catch (e) {
+      if (e instanceof ApiHttpError && e.code === "email_unverified") {
+        // The account exists but the emailed code was never entered.
+        set({ pendingVerification: { email: norm, password } });
+        return;
+      }
       if (!(e instanceof ApiOfflineError)) throw new Error(loginErrorMessage(e));
     }
     if (apiUser) {
@@ -221,9 +240,10 @@ export const useAppStore = create<AppState>((set, get) => ({
     if (password.length < 8) {
       throw new Error("Please use a password of at least 8 characters.");
     }
-    let apiUser: ApiUser | null = null;
+    let registered = false;
     try {
-      apiUser = await api.register(cleanEmail, password, cleanName);
+      await api.register(cleanEmail, password, cleanName);
+      registered = true;
     } catch (e) {
       if (!(e instanceof ApiOfflineError)) {
         if (e instanceof ApiHttpError && e.code === "email_taken") {
@@ -232,13 +252,9 @@ export const useAppStore = create<AppState>((set, get) => ({
         throw new Error("The account could not be created. Try again in a moment.");
       }
     }
-    if (apiUser) {
-      const account = await upsertLocalAccount(apiUser, password);
-      await AsyncStorage.setItem(SESSION_KEY, account.email);
-      set({
-        user: { name: account.name, email: account.email },
-        lastLoginMode: "api",
-      });
+    if (registered) {
+      // The account exists now but stays locked until the emailed code is entered.
+      set({ pendingVerification: { email: cleanEmail.toLowerCase(), password } });
       return;
     }
     // Server unreachable — create the account on this device only.
@@ -261,12 +277,73 @@ export const useAppStore = create<AppState>((set, get) => ({
     });
   },
 
+  verifyEmail: async (code) => {
+    const pending = get().pendingVerification;
+    if (!pending) throw new Error("There is nothing to verify — sign in again.");
+    if (code.trim() === "") throw new Error("Paste the code from the email first.");
+    let apiUser: ApiUser;
+    try {
+      apiUser = await api.verifyEmail(pending.email, code.trim());
+    } catch (e) {
+      if (e instanceof ApiOfflineError) {
+        throw new Error("The server could not be reached.");
+      }
+      if (e instanceof ApiHttpError && e.code === "rate_limited") {
+        throw new Error("Too many attempts. Wait a moment and try again.");
+      }
+      throw new Error("That code is not valid — request a new one and try again.");
+    }
+    if (!apiUser.roles.includes("practitioner")) {
+      void api.logout();
+      set({ pendingVerification: null });
+      throw new Error("This account is not a practitioner account.");
+    }
+    const account = await upsertLocalAccount(apiUser, pending.password);
+    await AsyncStorage.setItem(SESSION_KEY, account.email);
+    set({
+      user: { name: account.name, email: account.email },
+      lastLoginMode: "api",
+      pendingVerification: null,
+    });
+    void get().loadInbox();
+  },
+
+  resendVerification: async () => {
+    const pending = get().pendingVerification;
+    if (!pending) return;
+    try {
+      await api.resendVerification(pending.email);
+    } catch {
+      // Offline or server error: stay quiet, same as the enumeration-safe answer.
+    }
+  },
+
+  cancelVerification: () => set({ pendingVerification: null }),
+
   requestPasswordReset: async (email) => {
     if (email.trim() === "") throw new Error("Please enter your email address.");
     try {
       await api.forgotPassword(email.trim().toLowerCase());
     } catch {
       // Offline or server error: stay quiet, same as the enumeration-safe answer.
+    }
+  },
+
+  completePasswordReset: async (token, newPassword) => {
+    if (token.trim() === "") throw new Error("Paste the code from the email first.");
+    if (newPassword.length < 8) {
+      throw new Error("Please use a password of at least 8 characters.");
+    }
+    try {
+      await api.resetPassword(token.trim(), newPassword);
+    } catch (e) {
+      if (e instanceof ApiOfflineError) {
+        throw new Error("The server could not be reached.");
+      }
+      if (e instanceof ApiHttpError && e.code === "rate_limited") {
+        throw new Error("Too many attempts. Wait a moment and try again.");
+      }
+      throw new Error("That reset code is not valid any more — request a new one.");
     }
   },
 

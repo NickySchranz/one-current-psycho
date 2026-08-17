@@ -15,9 +15,10 @@ import {
 import { useTheme } from "@/ui/theme";
 
 /**
- * The signed-out flow: login, register, forgot password. Auth is a dummy
- * against local accounts for now — the screens and store contract are the
- * part that will survive a real backend.
+ * The signed-out flow: login, register, email verification, and forgot
+ * password. Auth is API-first with a local fallback when the server is
+ * unreachable; the verify screen shows whenever the store holds a
+ * registration that is still waiting on its emailed code.
  */
 
 type AuthScreen = "login" | "register" | "forgot";
@@ -177,32 +178,156 @@ function RegisterScreen({ go }: { go: (s: AuthScreen) => void }) {
   );
 }
 
-function ForgotPasswordScreen({ go }: { go: (s: AuthScreen) => void }) {
-  const requestPasswordReset = useAppStore((s) => s.requestPasswordReset);
-  const [email, setEmail] = useState("");
-  const [sent, setSent] = useState(false);
+function VerifyEmailScreen() {
+  const pending = useAppStore((s) => s.pendingVerification);
+  const verifyEmail = useAppStore((s) => s.verifyEmail);
+  const resendVerification = useAppStore((s) => s.resendVerification);
+  const cancelVerification = useAppStore((s) => s.cancelVerification);
+  const [code, setCode] = useState("");
   const [error, setError] = useState("");
+  const [resent, setResent] = useState(false);
+  const [busy, setBusy] = useState(false);
 
   const submit = async () => {
+    setBusy(true);
+    try {
+      setError("");
+      setResent(false);
+      await verifyEmail(code);
+      // The store signs the user in — this screen unmounts by itself.
+    } catch (e) {
+      setError(e instanceof Error ? e.message : "The verification failed.");
+    } finally {
+      setBusy(false);
+    }
+  };
+
+  const resend = async () => {
+    setError("");
+    setResent(false);
+    await resendVerification();
+    setResent(true);
+  };
+
+  return (
+    <Card>
+      <Hint>
+        We sent a code to {pending?.email ?? "your email"}. Paste it here to finish signing
+        up.
+      </Hint>
+      <Field label="Verification code">
+        <AppTextInput
+          value={code}
+          onChangeText={setCode}
+          autoCapitalize="characters"
+          autoComplete="one-time-code"
+          accessibilityLabel="Verification code"
+          placeholder="The code from the email"
+          onSubmitEditing={() => void submit()}
+        />
+      </Field>
+      <ErrorHint message={error} />
+      {resent && <Hint>A new code is on its way.</Hint>}
+      <Button
+        variant="primary"
+        large
+        label={busy ? "One moment…" : "Verify"}
+        disabled={busy || code.trim() === ""}
+        onPress={() => void submit()}
+      />
+      <View style={[rowStyles.filterRow, { marginTop: 12, justifyContent: "space-between" }]}>
+        <Button variant="quiet" label="Resend the code" onPress={() => void resend()} />
+        <Button variant="quiet" label="← Back to sign in" onPress={cancelVerification} />
+      </View>
+    </Card>
+  );
+}
+
+function ForgotPasswordScreen({ go }: { go: (s: AuthScreen) => void }) {
+  const requestPasswordReset = useAppStore((s) => s.requestPasswordReset);
+  const completePasswordReset = useAppStore((s) => s.completePasswordReset);
+  const [email, setEmail] = useState("");
+  const [sent, setSent] = useState(false);
+  const [token, setToken] = useState("");
+  const [newPassword, setNewPassword] = useState("");
+  const [done, setDone] = useState(false);
+  const [error, setError] = useState("");
+  const [busy, setBusy] = useState(false);
+
+  const submit = async () => {
+    setBusy(true);
     try {
       setError("");
       await requestPasswordReset(email);
       setSent(true);
     } catch (e) {
       setError(e instanceof Error ? e.message : "The request failed.");
+    } finally {
+      setBusy(false);
+    }
+  };
+
+  const submitReset = async () => {
+    setBusy(true);
+    try {
+      setError("");
+      await completePasswordReset(token, newPassword);
+      setDone(true);
+    } catch (e) {
+      setError(e instanceof Error ? e.message : "The reset failed.");
+    } finally {
+      setBusy(false);
     }
   };
 
   return (
     <Card>
-      {sent ? (
+      {done ? (
+        <>
+          <CalmNote>
+            <T>Your password is updated — sign in with it now.</T>
+          </CalmNote>
+          <View style={[rowStyles.filterRow, { marginTop: 12 }]}>
+            <Button variant="quiet" label="← Back to sign in" onPress={() => go("login")} />
+          </View>
+        </>
+      ) : sent ? (
         <>
           <CalmNote>
             <T>
-              If an account exists for {email.trim()}, a reset link is on its way. Check your
-              inbox.
+              If an account exists for {email.trim()}, a code is on its way. Paste it here
+              with a new password.
             </T>
           </CalmNote>
+          <Field label="Code from the email">
+            <AppTextInput
+              value={token}
+              onChangeText={setToken}
+              autoCapitalize="none"
+              autoComplete="one-time-code"
+              accessibilityLabel="Code from the email"
+              placeholder="The code from the email"
+            />
+          </Field>
+          <Field label="New password">
+            <AppTextInput
+              value={newPassword}
+              onChangeText={setNewPassword}
+              secureTextEntry
+              autoComplete="new-password"
+              accessibilityLabel="New password"
+              placeholder="At least 8 characters"
+              onSubmitEditing={() => void submitReset()}
+            />
+          </Field>
+          <ErrorHint message={error} />
+          <Button
+            variant="primary"
+            large
+            label={busy ? "One moment…" : "Set the new password"}
+            disabled={busy || token.trim() === "" || newPassword === ""}
+            onPress={() => void submitReset()}
+          />
           <View style={[rowStyles.filterRow, { marginTop: 12 }]}>
             <Button variant="quiet" label="← Back to sign in" onPress={() => go("login")} />
           </View>
@@ -210,7 +335,7 @@ function ForgotPasswordScreen({ go }: { go: (s: AuthScreen) => void }) {
       ) : (
         <>
           <Hint>
-            Enter the email you registered with and we'll send you a link to reset your
+            Enter the email you registered with and we'll send you a code to set a new
             password.
           </Hint>
           <Field label="Email">
@@ -229,8 +354,8 @@ function ForgotPasswordScreen({ go }: { go: (s: AuthScreen) => void }) {
           <Button
             variant="primary"
             large
-            label="Send reset link"
-            disabled={email.trim() === ""}
+            label={busy ? "One moment…" : "Send the code"}
+            disabled={busy || email.trim() === ""}
             onPress={() => void submit()}
           />
           <View style={[rowStyles.filterRow, { marginTop: 12 }]}>
@@ -244,6 +369,14 @@ function ForgotPasswordScreen({ go }: { go: (s: AuthScreen) => void }) {
 
 export function AuthFlow() {
   const [screen, setScreen] = useState<AuthScreen>("login");
+  const pendingVerification = useAppStore((s) => s.pendingVerification);
+  if (pendingVerification) {
+    return (
+      <AuthShell>
+        <VerifyEmailScreen />
+      </AuthShell>
+    );
+  }
   return (
     <AuthShell>
       {screen === "login" && <LoginScreen go={setScreen} />}

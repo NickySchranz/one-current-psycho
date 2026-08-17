@@ -190,18 +190,27 @@ export const api = {
   login: async (email: string, password: string) =>
     storeSession(await call<AuthResponse>("POST", "/auth/login", { email, password })),
 
-  /** Practitioner registration — the role travels with the request. */
-  register: async (email: string, password: string, name?: string) =>
-    storeSession(
-      await call<AuthResponse>("POST", "/auth/register", {
-        email,
-        password,
-        name,
-        role: "practitioner",
-      }),
-    ),
+  /** Practitioner registration — the role travels with the request. No session
+   * comes back: the account stays locked until the emailed code is verified. */
+  register: (email: string, password: string, name?: string) =>
+    call<{ needsVerification: true; email: string }>("POST", "/auth/register", {
+      email,
+      password,
+      name,
+      role: "practitioner",
+    }),
+
+  /** Trade the emailed verification code for a session (auto sign-in). */
+  verifyEmail: async (email: string, code: string) =>
+    storeSession(await call<AuthResponse>("POST", "/auth/verify", { email, code })),
+
+  resendVerification: (email: string) =>
+    call<{ ok: true }>("POST", "/auth/resend-verification", { email }),
 
   forgotPassword: (email: string) => call<{ ok: true }>("POST", "/auth/forgot", { email }),
+
+  resetPassword: (token: string, newPassword: string) =>
+    call<{ ok: true }>("POST", "/auth/reset", { token, newPassword }),
 
   /** Fire-and-forget server logout; local tokens are cleared regardless. */
   logout: async () => {
