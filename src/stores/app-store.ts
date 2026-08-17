@@ -44,8 +44,10 @@ type AppState = {
   /**
    * A registration (or sign-in) waiting on the emailed verification code.
    * The password is kept so the local account can be created after verify.
+   * devCode is present when the server has no email provider and handed
+   * the code back directly so the app can show it.
    */
-  pendingVerification: { email: string; password: string } | null;
+  pendingVerification: { email: string; password: string; devCode?: string } | null;
   /** Shares patients addressed to this practitioner, waiting to be accepted. */
   inbox: InboxShare[];
   inboxStatus: "idle" | "loading" | "error";
@@ -61,8 +63,11 @@ type AppState = {
   resendVerification: () => Promise<void>;
   /** Abandon the verification screen and go back to sign-in. */
   cancelVerification: () => void;
-  /** Asks the server for a reset code; stays quiet about whether the account exists. */
-  requestPasswordReset: (email: string) => Promise<void>;
+  /**
+   * Asks the server for a reset code; stays quiet about whether the account
+   * exists. Returns the code when the server has no email provider.
+   */
+  requestPasswordReset: (email: string) => Promise<string | undefined>;
   /** Set a new password with the emailed reset code. Throws a readable Error. */
   completePasswordReset: (token: string, newPassword: string) => Promise<void>;
   logout: () => Promise<void>;
@@ -240,10 +245,9 @@ export const useAppStore = create<AppState>((set, get) => ({
     if (password.length < 8) {
       throw new Error("Please use a password of at least 8 characters.");
     }
-    let registered = false;
+    let registered: { devCode?: string } | null = null;
     try {
-      await api.register(cleanEmail, password, cleanName);
-      registered = true;
+      registered = await api.register(cleanEmail, password, cleanName);
     } catch (e) {
       if (!(e instanceof ApiOfflineError)) {
         if (e instanceof ApiHttpError && e.code === "email_taken") {
@@ -254,7 +258,13 @@ export const useAppStore = create<AppState>((set, get) => ({
     }
     if (registered) {
       // The account exists now but stays locked until the emailed code is entered.
-      set({ pendingVerification: { email: cleanEmail.toLowerCase(), password } });
+      set({
+        pendingVerification: {
+          email: cleanEmail.toLowerCase(),
+          password,
+          devCode: registered.devCode,
+        },
+      });
       return;
     }
     // Server unreachable — create the account on this device only.
@@ -312,7 +322,10 @@ export const useAppStore = create<AppState>((set, get) => ({
     const pending = get().pendingVerification;
     if (!pending) return;
     try {
-      await api.resendVerification(pending.email);
+      const res = await api.resendVerification(pending.email);
+      if (res.devCode) {
+        set({ pendingVerification: { ...pending, devCode: res.devCode } });
+      }
     } catch {
       // Offline or server error: stay quiet, same as the enumeration-safe answer.
     }
@@ -323,9 +336,11 @@ export const useAppStore = create<AppState>((set, get) => ({
   requestPasswordReset: async (email) => {
     if (email.trim() === "") throw new Error("Please enter your email address.");
     try {
-      await api.forgotPassword(email.trim().toLowerCase());
+      const res = await api.forgotPassword(email.trim().toLowerCase());
+      return res.devCode;
     } catch {
       // Offline or server error: stay quiet, same as the enumeration-safe answer.
+      return undefined;
     }
   },
 

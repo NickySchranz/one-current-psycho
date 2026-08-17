@@ -215,6 +215,11 @@ function VerifyEmailScreen() {
         We sent a code to {pending?.email ?? "your email"}. Paste it here to finish signing
         up.
       </Hint>
+      {pending?.devCode && (
+        <CalmNote>
+          <T>Email delivery is not set up yet — use this code: {pending.devCode}</T>
+        </CalmNote>
+      )}
       <Field label="Verification code">
         <AppTextInput
           value={code}
@@ -253,12 +258,14 @@ function ForgotPasswordScreen({ go }: { go: (s: AuthScreen) => void }) {
   const [done, setDone] = useState(false);
   const [error, setError] = useState("");
   const [busy, setBusy] = useState(false);
+  const [devCode, setDevCode] = useState("");
 
   const submit = async () => {
     setBusy(true);
     try {
       setError("");
-      await requestPasswordReset(email);
+      const dev = await requestPasswordReset(email);
+      setDevCode(dev ?? "");
       setSent(true);
     } catch (e) {
       setError(e instanceof Error ? e.message : "The request failed.");
@@ -299,6 +306,11 @@ function ForgotPasswordScreen({ go }: { go: (s: AuthScreen) => void }) {
               with a new password.
             </T>
           </CalmNote>
+          {devCode !== "" && (
+            <CalmNote>
+              <T>Email delivery is not set up yet — use this code: {devCode}</T>
+            </CalmNote>
+          )}
           <Field label="Code from the email">
             <AppTextInput
               value={token}

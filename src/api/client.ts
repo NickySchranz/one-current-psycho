@@ -191,9 +191,10 @@ export const api = {
     storeSession(await call<AuthResponse>("POST", "/auth/login", { email, password })),
 
   /** Practitioner registration — the role travels with the request. No session
-   * comes back: the account stays locked until the emailed code is verified. */
+   * comes back: the account stays locked until the emailed code is verified.
+   * When the server has no email provider, the code arrives here as devCode. */
   register: (email: string, password: string, name?: string) =>
-    call<{ needsVerification: true; email: string }>("POST", "/auth/register", {
+    call<{ needsVerification: true; email: string; devCode?: string }>("POST", "/auth/register", {
       email,
       password,
       name,
@@ -205,9 +206,10 @@ export const api = {
     storeSession(await call<AuthResponse>("POST", "/auth/verify", { email, code })),
 
   resendVerification: (email: string) =>
-    call<{ ok: true }>("POST", "/auth/resend-verification", { email }),
+    call<{ ok: true; devCode?: string }>("POST", "/auth/resend-verification", { email }),
 
-  forgotPassword: (email: string) => call<{ ok: true }>("POST", "/auth/forgot", { email }),
+  forgotPassword: (email: string) =>
+    call<{ ok: true; devCode?: string }>("POST", "/auth/forgot", { email }),
 
   resetPassword: (token: string, newPassword: string) =>
     call<{ ok: true }>("POST", "/auth/reset", { token, newPassword }),
