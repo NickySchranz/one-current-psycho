@@ -1,4 +1,4 @@
-import { View } from "react-native";
+import { Pressable, View } from "react-native";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 import { useAppStore } from "@/stores/app-store";
 import { alpha } from "@/ui/color";
@@ -16,6 +16,7 @@ export function Header({ wide = false }: { wide?: boolean }) {
   const clients = useAppStore((s) => s.clients);
   const logout = useAppStore((s) => s.logout);
   const lastLoginMode = useAppStore((s) => s.lastLoginMode);
+  const inboxCount = useAppStore((s) => s.inbox.length);
 
   const client =
     view.kind !== "clients" ? clients.find((c) => c.id === view.clientId) : undefined;
@@ -64,6 +65,22 @@ export function Header({ wide = false }: { wide?: boolean }) {
       >
         {title}
       </T>
+      {inboxCount > 0 && view.kind !== "clients" && (
+        <Pressable
+          accessibilityRole="button"
+          accessibilityLabel={`${inboxCount} incoming ${inboxCount === 1 ? "share" : "shares"}`}
+          onPress={() => setView({ kind: "clients" })}
+          style={{
+            borderWidth: 1,
+            borderColor: alpha(t.accent, 0.6),
+            borderRadius: 999,
+            paddingHorizontal: 8,
+            paddingVertical: 2,
+          }}
+        >
+          <T style={{ fontSize: 11.5, color: t.accent }}>{inboxCount} incoming</T>
+        </Pressable>
+      )}
       {lastLoginMode === "local" && (
         <T
           style={{

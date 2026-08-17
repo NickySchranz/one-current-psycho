@@ -1,5 +1,5 @@
 import { useEffect } from "react";
-import { View, useWindowDimensions } from "react-native";
+import { ActivityIndicator, View, useWindowDimensions } from "react-native";
 import { SafeAreaProvider } from "react-native-safe-area-context";
 import { StatusBar } from "expo-status-bar";
 import { useAppStore } from "@/stores/app-store";
@@ -43,7 +43,19 @@ function AppShell() {
   }, [init]);
 
   if (!ready) {
-    return <View accessibilityState={{ busy: true }} style={{ flex: 1, backgroundColor: tk.bg }} />;
+    return (
+      <View
+        accessibilityState={{ busy: true }}
+        style={{
+          flex: 1,
+          backgroundColor: tk.bg,
+          alignItems: "center",
+          justifyContent: "center",
+        }}
+      >
+        <ActivityIndicator color={tk.accent} />
+      </View>
+    );
   }
 
   if (!user) {

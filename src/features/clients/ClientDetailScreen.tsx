@@ -7,8 +7,8 @@ import {
   Button,
   Card,
   H1,
-  H2,
   Hint,
+  Overline,
   Panel,
   T,
   rowStyles,
@@ -97,9 +97,7 @@ export function ClientDetailScreen({ clientId }: { clientId: string }) {
         <H1 style={{ marginBottom: 4 }}>{client.name}</H1>
         {client.notes ? <Hint style={{ marginBottom: 0 }}>{client.notes}</Hint> : null}
 
-        <SessionNotes clientId={clientId} />
-
-        <H2 style={{ marginTop: 8 }}>Shared files</H2>
+        <Overline style={{ marginTop: 20 }}>What's shared</Overline>
         {shares.length === 0 && (
           <Card>
             <Hint style={{ marginBottom: 0 }}>
@@ -162,7 +160,9 @@ export function ClientDetailScreen({ clientId }: { clientId: string }) {
           </Card>
         ))}
 
-        <H2 style={{ marginTop: 8 }}>Import a shared file</H2>
+        <SessionNotes clientId={clientId} />
+
+        <Overline style={{ marginTop: 20 }}>Add a share</Overline>
         <Card>
           <Hint>
             Your client exports this file from One Current under More → Share with a
@@ -195,7 +195,6 @@ export function ClientDetailScreen({ clientId }: { clientId: string }) {
           )}
         </Card>
 
-        <H2 style={{ marginTop: 8 }}>Or enter a share code</H2>
         <Card>
           <Hint>
             Your client can also upload their share and hand you an 8-character code
@@ -208,6 +207,7 @@ export function ClientDetailScreen({ clientId }: { clientId: string }) {
                 setCode(v);
                 setCodeOk(false);
               }}
+              editable={!redeeming}
               autoCapitalize="characters"
               placeholder="e.g. 7KDQ2MWX"
               accessibilityLabel="Share code"

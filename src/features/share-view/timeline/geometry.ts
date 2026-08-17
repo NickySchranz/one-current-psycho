@@ -143,6 +143,10 @@ export type EventPoint = {
   index: number;
   x: number;
   y: number;
+  /** Set when several same-day events collapsed into this one point. */
+  clusterSize?: number;
+  /** Indexes into thread.events for every event in the cluster. */
+  clusterIndexes?: number[];
 };
 
 export type ThreadGeometry = {
@@ -170,6 +174,8 @@ export type ThreadGeometry = {
   labelAnchor: "end" | undefined;
   labelVisible: boolean;
   label: string;
+  /** The untruncated label, shown while the thread holds the focus. */
+  fullLabel: string;
 };
 
 function clamp(v: number, lo: number, hi: number): number {
@@ -269,20 +275,40 @@ export function buildThreadGeometry(
   };
 
   // Moment and step markers sit on the line; started/integrated are drawn
-  // as the fork and merge points themselves. Same-day markers fan out.
+  // as the fork and merge points themselves. The first two same-day markers
+  // fan out; a third and beyond collapse into one counted cluster point.
   const eventPoints: EventPoint[] = [];
-  const dayCounts = new Map<string, number>();
+  const byDay = new Map<string, number[]>();
   thread.events.forEach((e, index) => {
     if (e.kind === "started" || e.kind === "integrated") return;
-    const seen = dayCounts.get(e.on) ?? 0;
-    dayCounts.set(e.on, seen + 1);
-    const x = clamp(scale.x(e.on) + seen * 9, forkEndX, runEnd);
-    eventPoints.push({ index, x, y: yAt(x) });
+    const list = byDay.get(e.on);
+    if (list) list.push(index);
+    else byDay.set(e.on, [index]);
   });
+  for (const [on, indexes] of byDay) {
+    const baseX = scale.x(on);
+    indexes.slice(0, 2).forEach((index, i) => {
+      const x = clamp(baseX + i * 9, forkEndX, runEnd);
+      eventPoints.push({ index, x, y: yAt(x) });
+    });
+    const rest = indexes.slice(2);
+    if (rest.length > 0) {
+      const x = clamp(baseX + 18, forkEndX, runEnd);
+      eventPoints.push({
+        index: rest[0],
+        x,
+        y: yAt(x),
+        clusterSize: rest.length,
+        clusterIndexes: rest,
+      });
+    }
+  }
 
   const truncated =
     thread.title.length > 34 ? thread.title.slice(0, 32) + "…" : thread.title;
-  const label = truncated + ((thread.returnedCount ?? 0) > 0 ? " · returned" : "");
+  const returnedSuffix = (thread.returnedCount ?? 0) > 0 ? " · returned" : "";
+  const label = truncated + returnedSuffix;
+  const fullLabel = thread.title + returnedSuffix;
   const runStart = forkEndX;
   const labelX = closed
     ? Math.max(forkEndX + 8, runStart + (runEnd - runStart) * 0.35)
@@ -309,5 +335,6 @@ export function buildThreadGeometry(
     labelAnchor,
     labelVisible: !closed || runEnd - runStart > 48,
     label,
+    fullLabel,
   };
 }

@@ -8,7 +8,9 @@ import AsyncStorage from "@react-native-async-storage/async-storage";
 
 const TOKENS_KEY = "one-current-psycho/tokens";
 const API_URL_KEY = "one-current-psycho/api-url";
-const DEFAULT_URL = "http://localhost:4000";
+const DEFAULT_URL = __DEV__
+  ? "http://localhost:4000"
+  : "https://one-current-api.nikischranz.workers.dev";
 const TIMEOUT_MS = 6000;
 
 export type Session = { access: string; refresh: string };
@@ -230,4 +232,30 @@ export const api = {
       { code },
       { auth: true },
     ),
+
+  /** Shares addressed to this practitioner that are still waiting. */
+  shareInbox: () =>
+    call<{ shares: InboxShare[] }>("GET", "/shares/inbox", undefined, { auth: true }),
+
+  /** Accept an inbox share directly — no code needed for addressed shares. */
+  acceptShare: (id: string) =>
+    call<{ meta: InboxShare; document: unknown }>(
+      "POST",
+      `/shares/${id}/accept`,
+      {},
+      { auth: true },
+    ),
+};
+
+/** Inbox metadata — the document only arrives on accept/redeem. */
+export type InboxShare = {
+  id: string;
+  fromEmail: string;
+  fromName?: string;
+  threadCount: number;
+  from: string;
+  to: string;
+  createdAt: string;
+  expiresAt: string;
+  redeemed: boolean;
 };

@@ -7,6 +7,7 @@ import {
   ApiOfflineError,
   loadTokens,
   type ApiUser,
+  type InboxShare,
 } from "@/api/client";
 import { db, type Account, type Client, type SessionNote, type StoredShare } from "@/db/database";
 import { buildExampleData } from "@/db/example-data";
@@ -40,6 +41,9 @@ type AppState = {
   user: AuthUser | null;
   /** How the last sign-in happened — "local" means the server was unreachable. */
   lastLoginMode: "api" | "local" | null;
+  /** Shares patients addressed to this practitioner, waiting to be accepted. */
+  inbox: InboxShare[];
+  inboxStatus: "idle" | "loading" | "error";
 
   init: () => Promise<void>;
   /** API-first auth, falling back to local accounts when the server is unreachable. */
@@ -51,7 +55,11 @@ type AppState = {
   logout: () => Promise<void>;
   setView: (view: View) => void;
   setTheme: (theme: ThemeId) => void;
-  addClient: (name: string, notes?: string) => Promise<void>;
+  /** Refresh the incoming-shares inbox. Quiet on failure — it's an extra, not a blocker. */
+  loadInbox: () => Promise<void>;
+  /** Accept an inbox share into a client's record. Throws a readable Error. */
+  acceptInboxShare: (shareId: string, clientId: string) => Promise<void>;
+  addClient: (name: string, notes?: string) => Promise<Client>;
   deleteClient: (id: string) => Promise<void>;
   /** Parse and store a share file's text for a client. Throws a readable Error. */
   importShare: (clientId: string, text: string) => Promise<void>;
@@ -130,6 +138,8 @@ export const useAppStore = create<AppState>((set, get) => ({
   sessionNotes: [],
   user: null,
   lastLoginMode: null,
+  inbox: [],
+  inboxStatus: "idle",
 
   init: async () => {
     const [clients, shares, sessionNotes, accounts, storedTheme, sessionEmail] =
@@ -163,6 +173,7 @@ export const useAppStore = create<AppState>((set, get) => ({
       user: session ? { name: session.name, email: session.email } : null,
       theme: storedTheme && isThemeId(storedTheme) ? storedTheme : "riverbed",
     });
+    if (session) void get().loadInbox();
   },
 
   login: async (email, password) => {
@@ -184,6 +195,7 @@ export const useAppStore = create<AppState>((set, get) => ({
         user: { name: account.name, email: account.email },
         lastLoginMode: "api",
       });
+      void get().loadInbox();
       return;
     }
     // Server unreachable — the local accounts still open the door.
@@ -261,7 +273,60 @@ export const useAppStore = create<AppState>((set, get) => ({
   logout: async () => {
     void api.logout();
     await AsyncStorage.removeItem(SESSION_KEY);
-    set({ user: null, view: { kind: "clients" }, lastLoginMode: null });
+    set({
+      user: null,
+      view: { kind: "clients" },
+      lastLoginMode: null,
+      inbox: [],
+      inboxStatus: "idle",
+    });
+  },
+
+  loadInbox: async () => {
+    if (!(await loadTokens())) return;
+    set({ inboxStatus: "loading" });
+    try {
+      const { shares } = await api.shareInbox();
+      set({ inbox: shares.filter((s) => !s.redeemed), inboxStatus: "idle" });
+    } catch {
+      // The inbox is an enhancement, never a blocker — surface a quiet retry.
+      set({ inboxStatus: "error" });
+    }
+  },
+
+  acceptInboxShare: async (shareId, clientId) => {
+    let document: unknown;
+    try {
+      ({ document } = await api.acceptShare(shareId));
+    } catch (e) {
+      if (e instanceof ApiOfflineError) {
+        throw new Error("The server could not be reached.");
+      }
+      if (e instanceof ApiHttpError && e.status === 404) {
+        throw new Error(
+          "That share is no longer available — it may have expired or been accepted already.",
+        );
+      }
+      if (e instanceof ApiHttpError && e.code === "rate_limited") {
+        throw new Error("Too many attempts. Wait a moment and try again.");
+      }
+      if (e instanceof ApiAuthError) {
+        throw new Error("Your session has expired — sign in again to accept shares.");
+      }
+      throw new Error("The share could not be accepted. Try again in a moment.");
+    }
+    const data = asShareExport(document);
+    const share: StoredShare = {
+      id: newId("share"),
+      clientId,
+      importedAt: new Date().toISOString(),
+      data,
+    };
+    await db.shares.put(share);
+    set((s) => ({
+      shares: [share, ...s.shares].sort(byImportedDesc),
+      inbox: s.inbox.filter((item) => item.id !== shareId),
+    }));
   },
 
   setView: (view) => set({ view }),
@@ -280,6 +345,7 @@ export const useAppStore = create<AppState>((set, get) => ({
     };
     await db.clients.put(client);
     set((s) => ({ clients: [...s.clients, client].sort(byName) }));
+    return client;
   },
 
   deleteClient: async (id) => {

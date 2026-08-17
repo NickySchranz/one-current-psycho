@@ -2,7 +2,7 @@ import { useState } from "react";
 import { View } from "react-native";
 import { useAppStore } from "@/stores/app-store";
 import { fmtDay } from "@/domain/dates";
-import { AppTextInput, Button, Card, H2, Hint, T, rowStyles } from "@/ui/primitives";
+import { AppTextInput, Button, Card, Hint, Overline, T, rowStyles } from "@/ui/primitives";
 
 /**
  * The psychologist's private notes for one client. Notes live only in
@@ -21,7 +21,7 @@ export function SessionNotes({ clientId }: { clientId: string }) {
 
   return (
     <>
-      <H2 style={{ marginTop: 20 }}>Session notes</H2>
+      <Overline style={{ marginTop: 20 }}>Session notes</Overline>
       <Card>
         <Hint>Your notes stay on this device and are never part of any share.</Hint>
         <AppTextInput

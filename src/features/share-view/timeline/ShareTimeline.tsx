@@ -154,13 +154,15 @@ export function ShareTimeline({
 
   const width = Math.max(containerW, MIN_WIDTH);
   const compact = width < 760;
-  const laneGap = compact ? LANE_GAP_COMPACT : LANE_GAP;
   const curveLength = compact ? CURVE_LENGTH_COMPACT : CURVE_LENGTH;
 
   const { scale, geometries, mainY, height } = useMemo(() => {
     const scale = makeDateScale(share.from, share.to, PAD_L, width - PAD_R);
     const lanes = assignLanes(share.threads, share.to);
     const { above, below } = laneExtents(lanes);
+    // Tight lanes only while they stay readable — with many lanes the chart
+    // grows vertically instead (the page scrolls; crowding doesn't).
+    const laneGap = compact && above + below <= 6 ? LANE_GAP_COMPACT : LANE_GAP;
     const mainY = TOP_PAD + above * laneGap;
     const height = TOP_PAD + (above + below) * laneGap + BOTTOM_PAD + AXIS_H;
     const metrics = { mainY, laneGap, curveLength, mode: tk.mode };
@@ -169,7 +171,7 @@ export function ShareTimeline({
       return buildThreadGeometry(th, lane, scale, metrics, share.from, share.to);
     });
     return { scale, geometries, mainY, height };
-  }, [share, width, laneGap, curveLength, tk.mode]);
+  }, [share, width, compact, curveLength, tk.mode]);
 
   const mainFlowProps = useMainFlow(tk.mainFlowDuration, reducedMotion);
 
@@ -345,7 +347,40 @@ function ThreadMarkers({
         const isSel =
           selection?.type === "event" &&
           selection.threadId === th.id &&
-          selection.index === p.index;
+          (selection.index === p.index ||
+            (p.clusterIndexes?.includes(selection.index) ?? false));
+        if (p.clusterSize) {
+          // Several same-day events folded into one counted point.
+          return (
+            <G key={p.index}>
+              <Circle
+                cx={p.x}
+                cy={p.y}
+                r={isSel ? 8 : 7}
+                fill={g.color}
+                stroke={tk.bg}
+                strokeWidth={1.5}
+                onPress={() =>
+                  setSelection(
+                    isSel ? null : { type: "event", threadId: th.id, index: p.index },
+                  )
+                }
+              />
+              <SvgText
+                x={p.x}
+                y={p.y + 3}
+                fontSize={9}
+                fontWeight="700"
+                fontFamily={tk.fontBody}
+                fill={tk.bg}
+                textAnchor="middle"
+                pointerEvents="none"
+              >
+                {p.clusterSize}
+              </SvgText>
+            </G>
+          );
+        }
         return (
           <Circle
             key={p.index}
@@ -399,8 +434,9 @@ function ThreadMarkers({
         />
       )}
 
-      {/* label: a stroked twin behind the text keeps it readable over lines */}
-      {g.labelVisible && (
+      {/* label: a stroked twin behind the text keeps it readable over lines.
+          A focused thread shows its full, untruncated title. */}
+      {(g.labelVisible || focused) && (
         <>
           <SvgText
             x={g.labelX}
@@ -414,7 +450,7 @@ function ThreadMarkers({
             fill={tk.bg}
             pointerEvents="none"
           >
-            {g.label}
+            {focused ? g.fullLabel : g.label}
           </SvgText>
           <SvgText
             x={g.labelX}
@@ -426,7 +462,7 @@ function ThreadMarkers({
             fill={g.color}
             onPress={() => setSelection({ type: "thread", threadId: th.id })}
           >
-            {g.label}
+            {focused ? g.fullLabel : g.label}
           </SvgText>
         </>
       )}

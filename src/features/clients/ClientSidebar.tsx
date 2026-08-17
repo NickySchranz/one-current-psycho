@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useMemo, useState } from "react";
 import {
   Pressable,
   ScrollView,
@@ -6,7 +6,9 @@ import {
   type PressableStateCallbackType,
 } from "react-native";
 import { useAppStore } from "@/stores/app-store";
+import { byRecentActivity, clientSummary } from "@/domain/client-activity";
 import { fmtDay } from "@/domain/dates";
+import { IncomingShares } from "@/features/clients/IncomingShares";
 import { alpha } from "@/ui/color";
 import { AppTextInput, Button, H3, Hint, T } from "@/ui/primitives";
 import { useTheme } from "@/ui/theme";
@@ -19,6 +21,7 @@ export function ClientSidebar() {
   const t = useTheme();
   const clients = useAppStore((s) => s.clients);
   const shares = useAppStore((s) => s.shares);
+  const sessionNotes = useAppStore((s) => s.sessionNotes);
   const view = useAppStore((s) => s.view);
   const setView = useAppStore((s) => s.setView);
   const addClient = useAppStore((s) => s.addClient);
@@ -31,7 +34,14 @@ export function ClientSidebar() {
 
   const selectedId =
     view.kind === "client" || view.kind === "share" ? view.clientId : undefined;
-  const shown = clients.filter((c) =>
+  const rows = useMemo(
+    () =>
+      clients
+        .map((client) => ({ client, summary: clientSummary(client, shares, sessionNotes) }))
+        .sort(byRecentActivity),
+    [clients, shares, sessionNotes],
+  );
+  const shown = rows.filter(({ client: c }) =>
     c.name.toLowerCase().includes(filter.trim().toLowerCase()),
   );
 
@@ -102,6 +112,7 @@ export function ClientSidebar() {
       </View>
 
       <ScrollView style={{ flex: 1 }}>
+        <IncomingShares compact />
         {clients.length === 0 && (
           <View style={{ padding: 16 }}>
             <Hint>No clients yet. Add one above, or load the examples to explore.</Hint>
@@ -111,9 +122,7 @@ export function ClientSidebar() {
         {shown.length === 0 && clients.length > 0 && (
           <Hint style={{ padding: 16 }}>No client matches “{filter.trim()}”.</Hint>
         )}
-        {shown.map((c) => {
-          const clientShares = shares.filter((sh) => sh.clientId === c.id);
-          const latest = clientShares[0];
+        {shown.map(({ client: c, summary }) => {
           const selected = c.id === selectedId;
           return (
             <Pressable
@@ -150,11 +159,9 @@ export function ClientSidebar() {
                 </T>
               ) : null}
               <T style={{ fontSize: 12.8, color: t.inkFaint, marginTop: 2 }}>
-                {clientShares.length === 0
+                {summary.shareCount === 0
                   ? "No shared files"
-                  : clientShares.length === 1
-                    ? `1 share · ${fmtDay(latest.data.exportedAt)}`
-                    : `${clientShares.length} shares · ${fmtDay(latest.data.exportedAt)}`}
+                  : `${summary.shareCount} ${summary.shareCount === 1 ? "share" : "shares"} · ${summary.openThreads} open · ${fmtDay(summary.latestExportedAt ?? c.createdAt)}`}
               </T>
             </Pressable>
           );

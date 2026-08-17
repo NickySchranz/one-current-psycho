@@ -1,7 +1,9 @@
-import { useState } from "react";
+import { useMemo, useState } from "react";
 import { Pressable, ScrollView, View } from "react-native";
 import { useAppStore } from "@/stores/app-store";
+import { byRecentActivity, clientSummary } from "@/domain/client-activity";
 import { fmtDay } from "@/domain/dates";
+import { IncomingShares } from "@/features/clients/IncomingShares";
 import {
   AppTextInput,
   Button,
@@ -22,6 +24,7 @@ export function ClientListScreen() {
   const t = useTheme();
   const clients = useAppStore((s) => s.clients);
   const shares = useAppStore((s) => s.shares);
+  const sessionNotes = useAppStore((s) => s.sessionNotes);
   const setView = useAppStore((s) => s.setView);
   const addClient = useAppStore((s) => s.addClient);
   const deleteClient = useAppStore((s) => s.deleteClient);
@@ -30,6 +33,14 @@ export function ClientListScreen() {
   const [name, setName] = useState("");
   const [notes, setNotes] = useState("");
   const [confirmingId, setConfirmingId] = useState<string | null>(null);
+
+  const rows = useMemo(
+    () =>
+      clients
+        .map((client) => ({ client, summary: clientSummary(client, shares, sessionNotes) }))
+        .sort(byRecentActivity),
+    [clients, shares, sessionNotes],
+  );
 
   return (
     <ScrollView style={{ flex: 1 }}>
@@ -40,6 +51,8 @@ export function ClientListScreen() {
           file on the client's page to see their shared window on a timeline.
         </Hint>
 
+        <IncomingShares />
+
         {clients.length === 0 && (
           <Card>
             <Hint style={{ marginBottom: 0 }}>
@@ -48,9 +61,19 @@ export function ClientListScreen() {
           </Card>
         )}
 
-        {clients.map((c) => {
-          const clientShares = shares.filter((sh) => sh.clientId === c.id);
-          const latest = clientShares[0];
+        {rows.map(({ client: c, summary }) => {
+          const meta =
+            summary.shareCount === 0
+              ? ["No shared files yet"]
+              : [
+                  summary.openThreads === 1
+                    ? "1 open thread"
+                    : `${summary.openThreads} open threads`,
+                  summary.latestExportedAt
+                    ? `latest export ${fmtDay(summary.latestExportedAt)}`
+                    : null,
+                ];
+          if (summary.lastNoteOn) meta.push(`last note ${fmtDay(summary.lastNoteOn)}`);
           return (
             <Card key={c.id}>
               <Pressable
@@ -61,11 +84,7 @@ export function ClientListScreen() {
                 <H3 style={{ marginBottom: 2 }}>{c.name}</H3>
                 {c.notes ? <Hint style={{ marginBottom: 4 }}>{c.notes}</Hint> : null}
                 <T style={{ fontSize: 13.6, color: t.inkSoft }}>
-                  {clientShares.length === 0
-                    ? "No shared files yet"
-                    : clientShares.length === 1
-                      ? `1 shared file · latest export ${fmtDay(latest.data.exportedAt)}`
-                      : `${clientShares.length} shared files · latest export ${fmtDay(latest.data.exportedAt)}`}
+                  {meta.filter(Boolean).join(" · ")}
                 </T>
               </Pressable>
               <View style={[rowStyles.filterRow, { marginTop: 10 }]}>

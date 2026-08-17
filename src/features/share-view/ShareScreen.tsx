@@ -8,6 +8,7 @@ import { DayByDayList } from "./DayByDayList";
 import { SharePulse } from "./SharePulse";
 import { ThreadList } from "./ThreadList";
 import { ShareTimeline } from "./timeline/ShareTimeline";
+import { TimelineLegend } from "./timeline/TimelineLegend";
 import { previousShareTo, whatsNew } from "./whats-new";
 import type { Selection } from "./selection";
 
@@ -91,10 +92,7 @@ export function ShareView({
           label={`Timeline — ${data.threads.length} thread${data.threads.length === 1 ? "" : "s"} across ${windowWeeks(data.from, data.to)} week${windowWeeks(data.from, data.to) === 1 ? "" : "s"}`}
         >
           <ShareTimeline share={data} selection={selection} onSelect={select} />
-          <Hint style={{ marginTop: 4, marginBottom: 0 }}>
-            Louder threads sit further from the main line, draw heavier and tremble.
-            Tap a line for the thread, a dot for what happened there.
-          </Hint>
+          <TimelineLegend />
         </Disclosure>
 
         {/* every thread, expandable in place */}
