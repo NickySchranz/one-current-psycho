@@ -13,6 +13,7 @@ import {
   rowStyles,
 } from "@/ui/primitives";
 import { useTheme } from "@/ui/theme";
+import { Logo } from "@/features/navigation/Logo";
 
 /**
  * The signed-out flow: login, register, email verification, and forgot
@@ -28,6 +29,9 @@ function AuthShell({ children }: { children: React.ReactNode }) {
     <ScrollView style={{ flex: 1 }} contentContainerStyle={{ flexGrow: 1, justifyContent: "center" }}>
       <View style={{ alignItems: "center", paddingHorizontal: 16, paddingVertical: 32 }}>
         <View style={{ width: "100%", maxWidth: 420 }}>
+          <View style={{ alignItems: "center", marginBottom: 10 }}>
+            <Logo size={30} />
+          </View>
           <H1 style={{ textAlign: "center", marginBottom: 20 }}>One Current — Practice</H1>
           {children}
         </View>

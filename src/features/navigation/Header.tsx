@@ -4,6 +4,7 @@ import { useAppStore } from "@/stores/app-store";
 import { alpha } from "@/ui/color";
 import { Button, T } from "@/ui/primitives";
 import { useTheme } from "@/ui/theme";
+import { Logo } from "./Logo";
 
 /** App header: back navigation driven by the view, title, theme toggle. */
 export function Header({ wide = false }: { wide?: boolean }) {
@@ -53,6 +54,7 @@ export function Header({ wide = false }: { wide?: boolean }) {
           }
         />
       )}
+      {view.kind === "clients" && <Logo size={18} />}
       <T
         numberOfLines={1}
         style={{
