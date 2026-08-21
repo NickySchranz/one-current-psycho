@@ -1,5 +1,5 @@
 import AsyncStorage from "@react-native-async-storage/async-storage";
-import type { ShareExport } from "@/domain/share-types";
+import type { AnyShare } from "@/domain/share-types";
 
 /**
  * Cross-platform persistence: each table is one JSON document in
@@ -21,7 +21,7 @@ export type StoredShare = {
   clientId: string;
   /** ISO timestamp of when the file was imported here. */
   importedAt: string;
-  data: ShareExport;
+  data: AnyShare;
 };
 
 /**

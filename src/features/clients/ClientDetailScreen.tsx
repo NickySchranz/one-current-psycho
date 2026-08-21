@@ -130,7 +130,13 @@ export function ClientDetailScreen({ clientId }: { clientId: string }) {
               {fmtDay(sh.data.from)} → {fmtDay(sh.data.to)}
             </T>
             <T style={{ fontSize: 13.6, color: t.inkSoft, marginTop: 2 }}>
-              {sh.data.threads.length === 1 ? "1 thread" : `${sh.data.threads.length} threads`}
+              {"springs" in sh.data
+                ? sh.data.springs.length === 1
+                  ? "1 spring"
+                  : `${sh.data.springs.length} springs`
+                : sh.data.threads.length === 1
+                  ? "1 thread"
+                  : `${sh.data.threads.length} threads`}
               {" · exported "}
               {fmtDay(sh.data.exportedAt)}
             </T>

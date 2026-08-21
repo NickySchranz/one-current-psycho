@@ -121,3 +121,67 @@ export type ShareExport = {
   to: string;
   threads: SharedThread[];
 };
+
+// ---------------------------------------------------------------------------
+// Wellspring — the sibling app for values. Same posture as above: this file
+// mirrors wellspring/src/domain/share/build-share-export.ts; bump versions
+// in lock-step.
+
+export type SharedSpring = {
+  id: string;
+  name: string;
+  /** "I am someone who…" */
+  identity: string;
+  color: string;
+  presence?: number;
+  createdAt: string;
+  retiredAt?: string;
+  eraLabel?: string;
+};
+
+export type SharedSpringMoment = {
+  id: string;
+  springId: string;
+  text: string;
+  /** Where it came from: absent/"wellspring" = noticed there, "one-current" = a handled worry. */
+  source?: "wellspring" | "one-current";
+  at: string;
+};
+
+export type SharedStrength = {
+  id: string;
+  springId: string;
+  date: string;
+  /** 1 (a whisper) – 5 (leading); fractional allowed. */
+  value: number;
+};
+
+export type SharedIntention = {
+  id: string; // YYYY-MM-DD
+  springIds: string[];
+  note?: string;
+};
+
+export type SharedDay = {
+  date: string;
+  flowScore: number;
+  flowWord: string;
+};
+
+export type WellspringShare = {
+  app: "wellspring-share";
+  version: 1;
+  exportedAt: string;
+  from: string;
+  to: string;
+  springs: SharedSpring[];
+  moments: SharedSpringMoment[];
+  intentions: SharedIntention[];
+  strengths: SharedStrength[];
+  days: SharedDay[];
+};
+
+export type AnyShare = ShareExport | WellspringShare;
+
+export const isWellspringShare = (s: AnyShare): s is WellspringShare =>
+  s.app === "wellspring-share";

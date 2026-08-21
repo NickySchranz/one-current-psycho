@@ -1,5 +1,6 @@
 import type { Client, SessionNote, StoredShare } from "@/db/database";
 import { isClosedThread } from "@/features/share-view/timeline/geometry";
+import { isWellspringShare } from "@/domain/share-types";
 
 /** A quick read on a client: what they shared, and when something last moved. */
 export type ClientSummary = {
@@ -8,6 +9,7 @@ export type ClientSummary = {
   latestExportedAt?: string;
   /** Open threads in the most recent share — the freshest picture we hold. */
   openThreads: number;
+  springCount: number;
   /** Date of the most recent session note, if any. */
   lastNoteOn?: string;
   /** The most recent of: latest export, latest note, the client's creation. */
@@ -41,9 +43,21 @@ export function clientSummary(
   return {
     shareCount: own.length,
     latestExportedAt: latest?.data.exportedAt,
-    openThreads: latest
-      ? latest.data.threads.filter((th) => !isClosedThread(th)).length
-      : 0,
+    openThreads:
+      latest && !isWellspringShare(latest.data)
+        ? latest.data.threads.filter((th) => !isClosedThread(th)).length
+        : 0,
+    springCount:
+      latest && isWellspringShare(latest.data)
+        ? latest.data.springs.filter((sp) => !sp.retiredAt).length
+        : own.some((sh) => isWellspringShare(sh.data))
+          ? (own
+              .filter((sh) => isWellspringShare(sh.data))
+              .sort((a, b) => b.data.exportedAt.localeCompare(a.data.exportedAt))[0]!
+              .data as import("@/domain/share-types").WellspringShare).springs.filter(
+              (sp) => !sp.retiredAt,
+            ).length
+          : 0,
     lastNoteOn,
     lastActivity,
   };

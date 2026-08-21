@@ -161,7 +161,7 @@ export function ClientSidebar() {
               <T style={{ fontSize: 12.8, color: t.inkFaint, marginTop: 2 }}>
                 {summary.shareCount === 0
                   ? "No shared files"
-                  : `${summary.shareCount} ${summary.shareCount === 1 ? "share" : "shares"} · ${summary.openThreads} open · ${fmtDay(summary.latestExportedAt ?? c.createdAt)}`}
+                  : `${summary.shareCount} ${summary.shareCount === 1 ? "share" : "shares"} · ${summary.openThreads} open${summary.springCount > 0 ? ` · ${summary.springCount} springs` : ""} · ${fmtDay(summary.latestExportedAt ?? c.createdAt)}`}
               </T>
             </Pressable>
           );

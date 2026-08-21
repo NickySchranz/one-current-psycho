@@ -263,7 +263,9 @@ export type InboxShare = {
   id: string;
   fromEmail: string;
   fromName?: string;
+  kind?: "one-current" | "wellspring";
   threadCount: number;
+  springCount?: number;
   from: string;
   to: string;
   createdAt: string;

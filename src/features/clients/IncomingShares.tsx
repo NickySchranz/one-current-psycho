@@ -97,7 +97,11 @@ export function IncomingShares({ compact = false }: { compact?: boolean }) {
               ) : null}
               <T style={{ fontSize: 13.6, color: t.inkSoft, marginTop: 4 }}>
                 {fmtDay(item.from)} → {fmtDay(item.to)} ·{" "}
-                {item.threadCount === 1 ? "1 thread" : `${item.threadCount} threads`}
+                {item.kind === "wellspring"
+                  ? `${item.springCount ?? 0} ${item.springCount === 1 ? "spring" : "springs"} · Wellspring`
+                  : item.threadCount === 1
+                    ? "1 thread"
+                    : `${item.threadCount} threads`}
               </T>
               <T style={{ fontSize: 12.8, color: t.inkFaint, marginTop: 2 }}>
                 Expires {fmtDay(item.expiresAt)}

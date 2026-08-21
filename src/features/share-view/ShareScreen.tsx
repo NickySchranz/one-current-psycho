@@ -10,6 +10,7 @@ import { ThreadList } from "./ThreadList";
 import { ShareTimeline } from "./timeline/ShareTimeline";
 import { TimelineLegend } from "./timeline/TimelineLegend";
 import { previousShareTo, whatsNew } from "./whats-new";
+import { WellspringView } from "@/features/wellspring/WellspringView";
 import type { Selection } from "./selection";
 
 const DAY_MS = 24 * 60 * 60 * 1000;
@@ -136,5 +137,12 @@ export function ShareScreen({ clientId, shareId }: { clientId: string; shareId: 
     );
   }
 
+  if ("springs" in share.data) {
+    return (
+      <ScrollView style={{ flex: 1 }}>
+        <WellspringView data={share.data} />
+      </ScrollView>
+    );
+  }
   return <ShareView data={share.data} newSince={newSince} />;
 }

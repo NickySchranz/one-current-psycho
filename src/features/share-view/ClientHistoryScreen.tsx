@@ -16,12 +16,12 @@ export function ClientHistoryScreen({ clientId }: { clientId: string }) {
   const setView = useAppStore((s) => s.setView);
 
   const shares = useMemo(
-    () => allShares.filter((sh) => sh.clientId === clientId),
+    () => allShares.filter((sh) => sh.clientId === clientId && !("springs" in sh.data)),
     [allShares, clientId],
   );
 
   const merged = useMemo(
-    () => (shares.length > 0 ? mergeShares(shares.map((sh) => sh.data)) : null),
+    () => (shares.length > 0 ? mergeShares(shares.map((sh) => sh.data as import("@/domain/share-types").ShareExport)) : null),
     [shares],
   );
 

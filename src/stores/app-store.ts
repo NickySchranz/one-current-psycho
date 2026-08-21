@@ -12,7 +12,7 @@ import {
 import { db, type Account, type Client, type SessionNote, type StoredShare } from "@/db/database";
 import { buildExampleData } from "@/db/example-data";
 import { newId } from "@/domain/ids";
-import type { ShareExport } from "@/domain/share-types";
+import type { AnyShare, ShareExport, WellspringShare } from "@/domain/share-types";
 import { isThemeId, type ThemeId } from "@/ui/theme";
 
 const THEME_KEY = "one-current-psycho/theme";
@@ -103,7 +103,20 @@ function byNoteDateDesc(a: SessionNote, b: SessionNote): number {
 }
 
 /** Check that parsed JSON is a One Current share document. Throws a readable Error. */
-function asShareExport(data: unknown): ShareExport {
+function asAnyShare(data: unknown): AnyShare {
+  const doc = data as AnyShare | null;
+  if (
+    doc != null &&
+    doc.app === "wellspring-share" &&
+    doc.version === 1 &&
+    Array.isArray((doc as WellspringShare).springs)
+  ) {
+    return doc;
+  }
+  return asShareExportReal(data);
+}
+
+function asShareExportReal(data: unknown): ShareExport {
   const share = data as ShareExport | null;
   if (
     share == null ||
@@ -111,7 +124,7 @@ function asShareExport(data: unknown): ShareExport {
     share.version !== 1 ||
     !Array.isArray(share.threads)
   ) {
-    throw new Error("That file is not a One Current share.");
+    throw new Error("That file is not a One Current or Wellspring share.");
   }
   return share;
 }
@@ -407,7 +420,7 @@ export const useAppStore = create<AppState>((set, get) => ({
       }
       throw new Error("The share could not be accepted. Try again in a moment.");
     }
-    const data = asShareExport(document);
+    const data = asAnyShare(document);
     const share: StoredShare = {
       id: newId("share"),
       clientId,
@@ -463,7 +476,7 @@ export const useAppStore = create<AppState>((set, get) => ({
     } catch {
       throw new Error("That file is not valid JSON.");
     }
-    const data = asShareExport(parsed);
+    const data = asAnyShare(parsed);
     const share: StoredShare = {
       id: newId("share"),
       clientId,
@@ -496,7 +509,7 @@ export const useAppStore = create<AppState>((set, get) => ({
       }
       throw new Error("The code could not be redeemed. Try again in a moment.");
     }
-    const data = asShareExport(document);
+    const data = asAnyShare(document);
     const share: StoredShare = {
       id: newId("share"),
       clientId,

@@ -449,7 +449,71 @@ export function buildExampleData(now: Date): { clients: Client[]; shares: Stored
     ],
   };
 
+  // Maya also uses Wellspring — her values arrive alongside her threads.
+  const day10 = (n: number) => day(now, n);
+  const mayaWellspring = {
+    app: "wellspring-share" as const,
+    version: 1 as const,
+    exportedAt: at(now, 1, 9),
+    from: day10(14),
+    to: day10(1),
+    springs: [
+      {
+        id: "ws-patience",
+        name: "Patience",
+        identity: "I let things take the time they take.",
+        color: "gold",
+        createdAt: at(now, 60, 9),
+      },
+      {
+        id: "ws-honesty",
+        name: "Honesty",
+        identity: "I say the true thing kindly.",
+        color: "teal",
+        createdAt: at(now, 48, 9),
+      },
+      {
+        id: "ws-rest",
+        name: "Rest",
+        identity: "I am allowed to stop.",
+        color: "plum",
+        createdAt: at(now, 90, 9),
+        retiredAt: at(now, 20, 9),
+        eraLabel: "The recovery months",
+      },
+    ],
+    moments: [
+      { id: "wm1", springId: "ws-patience", text: "waited out the urge to send the angry reply", at: at(now, 2, 16) },
+      { id: "wm2", springId: "ws-honesty", text: "told Sam how the week actually went", at: at(now, 3, 19) },
+      { id: "wm3", springId: "ws-patience", text: "handled: The flat hunt", source: "one-current" as const, at: at(now, 4, 11) },
+      { id: "wm4", springId: "ws-honesty", text: "asked for the deadline to move instead of pretending", at: at(now, 6, 10) },
+    ],
+    intentions: [
+      { id: day10(2), springIds: ["ws-patience"], note: "slow morning, no scrolling" },
+      { id: day10(3), springIds: ["ws-patience", "ws-honesty"] },
+    ],
+    strengths: [
+      { id: `ws-patience:${day10(2)}`, springId: "ws-patience", date: day10(2), value: 4 },
+      { id: `ws-patience:${day10(6)}`, springId: "ws-patience", date: day10(6), value: 3 },
+      { id: `ws-patience:${day10(10)}`, springId: "ws-patience", date: day10(10), value: 2 },
+      { id: `ws-honesty:${day10(3)}`, springId: "ws-honesty", date: day10(3), value: 4 },
+      { id: `ws-honesty:${day10(8)}`, springId: "ws-honesty", date: day10(8), value: 3 },
+    ],
+    days: [
+      { date: day10(4), flowScore: 55, flowWord: "flowing" },
+      { date: day10(3), flowScore: 70, flowWord: "flowing" },
+      { date: day10(2), flowScore: 88, flowWord: "overflowing" },
+      { date: day10(1), flowScore: 40, flowWord: "sideways" },
+    ],
+  };
+
   const shares: StoredShare[] = [
+    {
+      id: "share_example_maya_wellspring",
+      clientId: "client_example_maya",
+      importedAt: at(now, 1, 18),
+      data: mayaWellspring,
+    },
     {
       id: "share_example_maya_recent",
       clientId: "client_example_maya",
