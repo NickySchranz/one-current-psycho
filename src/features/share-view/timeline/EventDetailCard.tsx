@@ -114,6 +114,7 @@ export function EventDetailCard({
           <TagRow label="Beliefs that aged out" items={event.outdatedBeliefs} />
           <TagRow label="Outside their control" items={event.outsideControl} />
           <TagRow label="Released" items={event.released} />
+          <TagRow label="Burned with it" items={event.burned} />
           {event.conflicts && event.conflicts.length > 0 ? (
             <View style={{ marginTop: 8 }}>
               <T style={{ fontSize: 13.6, color: t.inkSoft }}>Tensions worked through</T>
